@@ -20,5 +20,9 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
+  },
+
+  typescript: {
+    typeCheck: true
   }
 })
