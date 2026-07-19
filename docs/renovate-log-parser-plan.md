@@ -111,73 +111,361 @@ web/
 
 ## Component specs
 
-### Core: Parser (`src/core/parser.ts`)
+> The **Core** section below documents the API **as actually implemented in Phase 1** —
+> Phases 2–6 should import these exact signatures. Command/route sections are the
+> concrete contracts to build.
 
-- `load(absolutePath)`: md5 of file content -> `os.tmpdir()/renovate-log-parser-<md5>.db`.
-  Reuse if file exists **and** table has ≥1 row; else (re)create.
-- On load, scan `renovate-log-parser-*.db` in tmp, delete any with **zero rows**. Preserve
-  valid caches for other logs (no TTL/size cap).
-- Schema: single table, `logentry` JSON column, `rowid` = 0-indexed line number.
-  Expression indices on `json_extract(logentry,'$.level')`, `$.repository`, `$.branch`,
-  and `json_extract(...,'$.err') IS NOT NULL`.
-- Parse line-by-line inside a **transaction**. Malformed -> `_parseError`, blank -> `_blank`.
-- `query(sql)`: run SELECT, return parsed objects.
+### Core: filters (`src/core/filters.ts`) — DELIVERED
 
-### Core: QueryBuilder (`src/core/query-builder.ts`) + filters (`filters.ts`)
+```ts
+type FieldName = string;
+type ScalarValue = string | number | boolean;
+type GlobSearchMode = "key" | "value" | "both" | "keyValue";
 
-Primitives, all AND'd: `equals` (root key, scalar only), `presence`, `levelIn`,
-`glob` (key/value/both via `json_tree()`+`GLOB`, case-sensitive), and negation of each.
-Root-level keys only in v1; JSON-path internally. Parameterized SQL matching the index
-expressions.
+interface EqualsFilter {
+  type: "equals";
+  field: FieldName;
+  value: ScalarValue;
+  negate?: boolean;
+}
+interface PresenceFilter {
+  type: "presence";
+  field: FieldName;
+  negate?: boolean;
+}
+interface LevelFilter {
+  type: "levelIn";
+  levels: number[];
+  negate?: boolean;
+}
+interface GlobFilter {
+  type: "glob";
+  mode: GlobSearchMode;
+  keyPattern?: string;
+  valuePattern?: string;
+  pattern?: string;
+  negate?: boolean;
+}
+type Filter = EqualsFilter | PresenceFilter | LevelFilter | GlobFilter;
 
-### Command: `detect-errors <path>`
+function jsonPath(field): string; // -> $."field"  (escapes embedded ")
+function extractExpr(field, column = "logentry"): string; // -> json_extract(column, '$."field"')
+function parseKeyValueFilter(token): EqualsFilter; // "key:val" (splits on FIRST colon)
+```
 
-- Categories: `host-error-abort`, `err-object`, `config-migration` (provisional patterns),
-  `abandoned-package` (reserved, count 0, no detection).
-- Severity: `level>=50` = error; `level:40` + `repoProblems` (de-duped) +
-  `branchesInformation[].result==="error"` = warnings.
-- Ignore file `renovate-log-parser.ignore.json` (CWD default, `--ignore-file` override).
-- Human summary -> stdout; `--out <path>` writes v1 machine-readable JSON.
-- Exit codes `0`/`1`/`2`; `--fail-on-warn` opt-in.
+Semantics: all filters are AND'd. `equals` compares scalars only; **negated** equals is
+null-safe (`expr IS NULL OR expr <> ?`) so entries missing the field are kept when hiding a
+value. `presence` = `IS [NOT] NULL`. `levelIn` empty set => matches nothing (negated =>
+everything); negated is null-safe. `glob` uses `json_tree` + `GLOB` (case-sensitive); value
+matches restricted to leaf scalars via `json_tree.atom` (containers never match). Root-level
+keys only in v1 (paths are built as `$."key"` so nesting is a later non-breaking extension).
 
-### Command: `analyze <path> [args]`
+### Core: levels (`src/core/levels.ts`) — DELIVERED
 
-- No args -> pretty JSON stats:
-  `{ logFile, md5, totalLines, levelCounts, repos:[{name, fromLine, toLine, branches,
-branchesInformationLine, packageFilesLine, repoProblems, depNames, packageNames}] }`.
-- `--print` -> JSONL to stdout, truncation notices to stderr.
-- Args: `--ignored-fields` (default `v,time,logContext,pid,hostname,name`; `msg` never
-  strippable), `--line-from/--line-to` (0-indexed), `--limit` (default 50),
-  `--filter key:val` (repeatable), `--include-original-line` (adds `_oL`).
-- Ordering: range -> filter -> limit.
+```ts
+type LevelColor =
+  "muted" | "neutral" | "green" | "amber" | "red" | "red-filled";
+interface LevelMeta {
+  level: number;
+  name: string;
+  symbol: string;
+  color: LevelColor;
+}
+const LEVELS: Record<number, LevelMeta>; // 10 T muted, 20 D neutral, 30 I green,
+// 40 W amber, 50 E red, 60 F red-filled
+const ERROR_LEVELS = [50, 60]; // build-breaking for detect-errors
+const WARN_LEVEL = 40;
+function levelMeta(level): LevelMeta; // unknown => { symbol:String(level), color:"muted" }
+```
 
-### Command: `web` — stateful Nitro server
+The web layer maps `LevelColor` tokens to Nuxt UI/Tailwind classes (mapping table TBD in
+Phase 5a — keep it in one place, e.g. a `LEVEL_CLASS: Record<LevelColor,string>` in the UI).
 
-- Shared `Parser`/`QueryBuilder` via alias. `server/utils/log-registry.ts` = module
-  singleton `md5 -> {path, DatabaseSync}` + current pointer; reuses open handles.
-- Routes: `POST /api/log/path {path}`, `POST /api/log/contents` (bytes),
-  `GET /api/rows?filters=<json>&offset&limit` -> `{total,offset,limit,rows}`,
-  `GET /api/fields`, `GET /api/repositories`. No `md5` override.
-- CLI handoff: `path.resolve` -> open `http://localhost:<port>/?log=<abs>`.
+### Core: QueryBuilder (`src/core/query-builder.ts`) — DELIVERED
 
-### Web frontend
+```ts
+type SqlParam = string | number | bigint | null | Uint8Array;
+interface BuiltQuery {
+  sql: string;
+  params: SqlParam[];
+}
+interface QueryOptions {
+  lineFrom?: number;
+  lineTo?: number;
+  limit?: number;
+  offset?: number;
+  order?: "asc" | "desc";
+}
 
-- Virtualized row list; row = level glyph + `msg`; arrow -> 3/4-width `USlideover` JSON tree.
-- Reactive filter object: static dropdowns (levels, repositories + "Repository-independent",
-  ignored-fields with `msg` non-listable) + `enabled`-toggleable pills. Debounced refetch.
-- Search: 4 modes, glob -> `GLOB`, case-sensitive.
-- Context menus per Q20.
+function buildQuery(
+  filters?: readonly Filter[],
+  options?: QueryOptions,
+  columns = "rowid, logentry",
+): BuiltQuery;
+function buildCountQuery(
+  filters?: readonly Filter[],
+  options?: Pick<QueryOptions, "lineFrom" | "lineTo">,
+): BuiltQuery; // SELECT COUNT(*) AS n
+```
 
-### Skill: `.agents/skills/renovate-log-analyzer/SKILL.md`
+WHERE reuses the same `json_extract(...)`/level expressions the parser indexes. Always
+`ORDER BY rowid <asc|desc>` (stripped by `buildCountQuery`). `LIMIT`/`OFFSET` appended when set.
 
-Log-structure docs, `analyze` invocation, token-saving line-range workflow, parameterized
-`gh` recipe (placeholders for host/owner/repo/workflow): discover latest successful run ->
-download artifact -> unzip -> analyze.
+### Core: Parser (`src/core/parser.ts`) — DELIVERED
+
+```ts
+interface LoadResult {
+  path: string;
+  md5: string;
+  dbPath: string;
+  totalLines: number;
+  cached: boolean;
+}
+interface ParseErrorEntry {
+  _parseError: true;
+  _raw: string;
+}
+interface BlankEntry {
+  _blank: true;
+}
+
+class Parser {
+  get loaded(): LoadResult | undefined;
+  load(absolutePath: string): LoadResult; // sync; md5-cached; throws if file missing
+  query<T = Record<string, unknown>>(
+    sql: string,
+    params?: readonly SqlParam[],
+  ): T[];
+  queryEntries<T>(sql: string, params?): { line: number; entry: T }[]; // parses `logentry`
+  close(): void; // idempotent
+}
+```
+
+Schema: `CREATE TABLE logs (line INTEGER PRIMARY KEY, logentry TEXT NOT NULL)` (`line` aliases
+rowid = 0-indexed file line). Indices: `idx_level`, `idx_repository`, `idx_branch` (expression
+indices on `json_extract`), `idx_err` (partial, `err IS NOT NULL`). Cache at
+`os.tmpdir()/renovate-log-parser-<contentMd5>.db`; reused iff table has ≥1 row; zero-row/invalid
+caches deleted on every load; parse wrapped in `BEGIN/COMMIT` (crash => 0 rows => rebuilt).
+Malformed line => `ParseErrorEntry`; blank line => `BlankEntry`; a single trailing newline does
+**not** create an extra row (matches `wc -l`).
+
+> **Note (deviation from original plan):** `query()` takes an optional `params` array for
+> safe binding — the plan originally wrote `query(sql)`. Non-breaking; a bare SQL string works.
+
+---
+
+### Command: `detect-errors <path>` (Phase 2)
+
+**Synopsis**
+
+```
+renovate-log-parser detect-errors <path> [--out <file>] [--ignore-file <file>] [--fail-on-warn]
+```
+
+| Arg / flag       | Type    | Default                             | Meaning                                           |
+| ---------------- | ------- | ----------------------------------- | ------------------------------------------------- |
+| `<path>`         | string  | **required**                        | Absolute/relative path to the JSONL log           |
+| `--out`          | string  | (none)                              | Also write the machine-readable JSON to this path |
+| `--ignore-file`  | string  | `./renovate-log-parser.ignore.json` | Ignore-rules file (missing file = no rules)       |
+| `--fail-on-warn` | boolean | `false`                             | Make warning findings affect the exit code        |
+
+**Exit codes:** `0` = no non-ignored errors; `1` = ≥1 non-ignored error (or, with
+`--fail-on-warn`, ≥1 non-ignored warning); `2` = tool/usage error (bad path, unreadable, bad args).
+
+**Detection rules** (each finding = one category + severity):
+
+| Category            | Severity | Rule (provisional patterns marked ⚠ — verify vs real logs)                                                                                                                            |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `host-error-abort`  | error    | `msg === "External host error causing abort"` (exact)                                                                                                                                 |
+| `log-error`         | error    | `level === 50`                                                                                                                                                                        |
+| `log-fatal`         | error    | `level === 60`                                                                                                                                                                        |
+| `err-object`        | error    | entry has root-level `err` object (`presence` filter on `err`)                                                                                                                        |
+| `config-migration`  | error    | ⚠ `msg` matches (ci) `*config* needs migration*` / `*migration needed*`, OR entry carries a `migratedConfig`/`configMigrationCheck` object. Keep patterns in one documented constant. |
+| `abandoned-package` | warning  | RESERVED — always count 0, no detection yet (Q9)                                                                                                                                      |
+| `warn-log`          | warning  | `level === 40`                                                                                                                                                                        |
+| `repo-problem`      | warning  | each string in a `repoProblems` array, **de-duped** against overlapping `warn-log` messages                                                                                           |
+| `branch-error`      | warning  | any `branchesInformation[].result === "error"`                                                                                                                                        |
+
+**Machine-readable output schema (v1)** — written to `--out`; the counts map includes **every**
+known category (zeros too) for stable CI diffing:
+
+```jsonc
+{
+  "version": 1,
+  "logFile": "/abs/path/renovate.jsonl",
+  "logMd5": "…",
+  "generatedAt": "2026-…Z",
+  "exitCode": 1,
+  "summary": { "errorCount": 3, "warningCount": 6 },
+  "counts": {
+    "host-error-abort": 1,
+    "log-error": 0,
+    "log-fatal": 0,
+    "err-object": 2,
+    "config-migration": 0,
+    "abandoned-package": 0,
+    "warn-log": 6,
+    "repo-problem": 0,
+    "branch-error": 0,
+  },
+  "findings": [
+    {
+      "category": "err-object",
+      "severity": "error",
+      "message": "lock file error",
+      "line": 873,
+      "repository": "owner/repo",
+      "details": {/* category-specific */},
+      "ignored": false,
+    },
+  ],
+}
+```
+
+Human summary -> stdout (grouped by severity; ignored findings under a separate "ignored"
+section). Ignored findings appear in `findings` with `ignored:true` and are **excluded** from
+`summary`/exit-code.
+
+**Ignore-file schema** (`renovate-log-parser.ignore.json`):
+
+```jsonc
+{
+  "version": 1,
+  "rules": [
+    {
+      "category": "err-object", // required
+      "message": "*lock file error*", // optional glob (matched against finding.message)
+      "repository": "owner/repo", // optional exact match
+      "reason": "flaky nuget restore, JIRA-123", // optional, for humans
+      "expires": "2026-09-01",
+    }, // optional ISO date; past => rule inactive + warn
+  ],
+}
+```
+
+A finding is ignored iff an **active** rule matches on category AND (message glob if present)
+AND (repository if present). Expired rules are skipped with a warning to stderr.
+
+### Command: `analyze <path> [args]` (Phase 3)
+
+**Synopsis**
+
+```
+renovate-log-parser analyze <path>
+renovate-log-parser analyze <path> --print [--ignored-fields <csv>] [--line-from <n>]
+    [--line-to <n>] [--limit <n>] [--filter <key:val> …] [--include-original-line]
+```
+
+| Flag                        | Default                               | Meaning                                            |
+| --------------------------- | ------------------------------------- | -------------------------------------------------- |
+| `<path>`                    | **required**                          | Path to JSONL log                                  |
+| `--print`                   | off                                   | Switch from stats mode to line-printing mode       |
+| `--ignored-fields`          | `v,time,logContext,pid,hostname,name` | CSV of root keys to strip (`msg` never strippable) |
+| `--line-from` / `--line-to` | (none)                                | 0-indexed inclusive rowid range (either optional)  |
+| `--limit`                   | `50`                                  | Max lines to print                                 |
+| `--filter`                  | (none)                                | `key:val` scalar-equals, repeatable, AND'd         |
+| `--include-original-line`   | `false`                               | Add `_oL` = 0-indexed source line to each object   |
+
+**Stats mode (no `--print`)** — pretty JSON to stdout:
+
+```jsonc
+{
+  "logFile": "/abs/path", "md5": "…", "totalLines": 2028,
+  "levelCounts": { "20": 2003, "30": 18, "40": 6 },
+  "repos": [
+    { "name": "owner/repo",
+      "fromLine": 12, "toLine": 640,                 // rowid span of this repo's entries
+      "branches": ["renovate/x", …],                  // unique branch names
+      "branchesInformationLine": 512,                 // rowid of `branches info extended`, or null
+      "packageFilesLine": 649,                        // rowid of `packageFiles with updates`, or null
+      "repoProblems": ["⚠️ WARN: …"],
+      "depNames": ["react", …],                       // union: root-level depName + packageFiles config
+      "packageNames": ["…"] }                          // union: root-level packageName + packageFiles config
+  ]
+}
+```
+
+Repo grouping keyed by the `repository` value (git-URL repos included verbatim). Entries with
+no `repository` are not a repo (they may still be surfaced elsewhere later). `depNames`/
+`packageNames` union root-level keys with the dependency arrays inside the `config` of the
+entry where `msg === "packageFiles with updates"`, deduped.
+
+**Print mode (`--print`)** — **JSONL** to stdout (one stripped entry per line). Selection order:
+line-range -> filters -> `--limit` (first N by line order). Truncation notice (when `--limit`
+capped results) -> **stderr** so stdout stays clean. `_oL` added only when
+`--include-original-line`.
+
+### Command: `web` — stateful Nitro server (Phase 4)
+
+`server/utils/log-registry.ts` = module singleton: `Map<md5, { path, db: Parser }>` + a
+`current: md5 | null` pointer. A successful POST sets `current`; GET routes always use
+`current` (**no** `md5` param). Loading a new file replaces `current`.
+
+**Routes**
+
+| Method + path            | Request                                  | Response                                                       |
+| ------------------------ | ---------------------------------------- | -------------------------------------------------------------- |
+| `POST /api/log/path`     | `{ "path": "<absolute>" }`               | `{ md5, path, totalLines, levelCounts }` (blocks until parsed) |
+| `POST /api/log/contents` | raw/multipart bytes of an uploaded file  | `{ md5, path: "<temp>", totalLines, levelCounts }`             |
+| `GET  /api/rows`         | `?filters=<url-enc JSON>&offset=&limit=` | `{ total, offset, limit, rows: RowDTO[] }`                     |
+| `GET  /api/fields`       | —                                        | `string[]` (distinct root-level keys across the log)           |
+| `GET  /api/repositories` | —                                        | `string[]` (distinct `repository` values, verbatim)            |
+
+`RowDTO = { _oL: number, ...entryWithIgnoredFieldsStripped }` (`msg` never stripped). Errors:
+no current log => `409`; bad path / parse failure => `400`; unreadable => `500`.
+
+**`filters` wire format** — the JSON-encoded value of the reactive filter object (Phase 5),
+translated server-side into `Filter[]` + `QueryOptions`:
+
+```jsonc
+{
+  "levels": [20, 30, 40],                 // -> LevelFilter (empty/absent = all)
+  "repositories": {                        // -> EqualsFilter(s) on `repository`
+    "mode": "include" | "exclude",
+    "values": ["owner/repo", …],
+    "independent": true                    // include/exclude the no-`repository` pseudo-group
+  },
+  "ignoredFields": ["v","time", …],        // -> field stripping on RowDTO (not a WHERE clause)
+  "search": { "mode": "both"|"key"|"value"|"keyValue",
+              "pattern": "*abort*", "keyPattern": "…", "valuePattern": "…" }, // -> GlobFilter
+  "pills": [ { "id": "…", "enabled": true,
+               "filter": { "type": "equals", "field": "msg", "value": "…", "negate": true } } ]
+}
+```
+
+Disabled pills (`enabled:false`) are omitted from the query. `ignoredFields` shapes the
+response projection, not row matching.
+
+### Web frontend (Phase 5a list+details, 5b filters+search)
+
+- **5a**: virtualized row list (one row per line): level glyph (`levelMeta`) + `msg`; a left
+  arrow (shown when the entry has keys besides `msg`) opens a 3/4-width `USlideover` with a
+  recursive collapsible JSON-tree (all keys expanded, `msg` excluded). Header shows the current
+  log path + a file picker (POST `/api/log/contents`). On mount read `?log=` and POST
+  `/api/log/path`. `LEVEL_CLASS: Record<LevelColor,string>` maps tokens -> Tailwind classes.
+- **5b**: reactive filter object (`app/composables/useFilters.ts`) per the wire format above.
+  Static dropdowns: log levels; repositories (checkboxes + "Repository-independent"); ignored
+  fields (checkboxes from `/api/fields`, `msg` not listable). Dynamic **pills** with an
+  `enabled` toggle + remove. Row context menu (level/repo actions drive the static dropdowns;
+  message actions create pills). JSON-key context menu (show-only/hide `<field>`; show-only/hide
+  `<field>==<scalar>` — the value item only for scalar values) creates pills. Free-text search
+  box with the 4 modes. All changes debounce -> refetch `/api/rows`.
+
+### Skill: `.agents/skills/renovate-log-analyzer/SKILL.md` (Phase 6)
+
+Sections: (1) what the log is + the structure reference above; (2) how to invoke
+`analyze <path>` (stats) then `analyze <path> --print --line-from/--line-to …` to read only
+relevant ranges (token-saving loop: stats -> pick lines -> print); (3) a **parameterized** `gh`
+recipe with clearly-marked placeholders `<HOST>`/`<OWNER>/<REPO>`/`<WORKFLOW>`:
+`gh run list` -> latest successful run -> `gh run download` artifact -> unzip -> `analyze`.
+No org identity baked in; note users keep a filled-in git-ignored local copy.
 
 ### Tests — stubs only
 
-`node:test` scaffolding for parser/query-builder/error-detector/analyzer with placeholder
-fixtures. Real committable fixtures added later.
+`node:test` via `node --import tsx --test "src/**/*.test.ts"`. Build excludes test files via
+`tsconfig.build.json` (main `tsconfig.json` still lints/typechecks them). Phase 1 shipped 10
+stub tests (parser + query-builder). Add ErrorDetector/Analyzer stubs in their phases; flesh
+out with committable real-log fixtures later (Q25).
 
 ---
 
