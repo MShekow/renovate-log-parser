@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "build": "npm run build:web && npm run build:cli",
-    "build:cli": "tsc",
+    "build:cli": "tsc -p tsconfig.build.json",
     "build:web": "npm run build --workspace web",
     "dev:cli": "tsx src/cli.ts",
     "dev:web": "npm run dev --workspace web",
@@ -26,6 +26,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . && npm run lint --workspace web",
     "start": "node dist/cli.js",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

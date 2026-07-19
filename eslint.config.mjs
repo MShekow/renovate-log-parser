@@ -20,5 +20,13 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // node:test's `test()` returns a promise that is intentionally not awaited
+    // when registered at the top level of a test file.
+    files: ["src/**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+    },
+  },
   eslintConfigPrettier,
 );
