@@ -21,8 +21,8 @@ Use custom directives when:
 <script setup lang="ts">
 // v-focus directive
 const vFocus = {
-  mounted: (el: HTMLElement) => el.focus()
-}
+  mounted: (el: HTMLElement) => el.focus(),
+};
 </script>
 
 <template>
@@ -53,20 +53,20 @@ const myDirective = {
   beforeUnmount(el, binding, vnode) {},
 
   // After parent component unmounts
-  unmounted(el, binding, vnode) {}
-}
+  unmounted(el, binding, vnode) {},
+};
 ```
 
 ## Hook Arguments
 
 ```ts
 interface DirectiveBinding<T = any> {
-  value: T           // v-my-dir="value"
-  oldValue: T        // Previous value (beforeUpdate/updated only)
-  arg?: string       // v-my-dir:arg
-  modifiers: Record<string, boolean>  // v-my-dir.foo.bar → { foo: true, bar: true }
-  instance: ComponentPublicInstance   // Component using the directive
-  dir: ObjectDirective               // Directive definition object
+  value: T; // v-my-dir="value"
+  oldValue: T; // Previous value (beforeUpdate/updated only)
+  arg?: string; // v-my-dir:arg
+  modifiers: Record<string, boolean>; // v-my-dir.foo.bar → { foo: true, bar: true }
+  instance: ComponentPublicInstance; // Component using the directive
+  dir: ObjectDirective; // Directive definition object
 }
 ```
 
@@ -94,33 +94,33 @@ When you only need `mounted` and `updated` with same behavior:
 // Full form
 const vColor = {
   mounted(el, binding) {
-    el.style.color = binding.value
+    el.style.color = binding.value;
   },
   updated(el, binding) {
-    el.style.color = binding.value
-  }
-}
+    el.style.color = binding.value;
+  },
+};
 
 // Shorthand (same behavior)
 const vColor = (el: HTMLElement, binding: DirectiveBinding<string>) => {
-  el.style.color = binding.value
-}
+  el.style.color = binding.value;
+};
 ```
 
 ## Global Registration
 
 ```ts
 // main.ts
-const app = createApp(App)
+const app = createApp(App);
 
-app.directive('focus', {
-  mounted: (el) => el.focus()
-})
+app.directive("focus", {
+  mounted: (el) => el.focus(),
+});
 
 // Shorthand
-app.directive('color', (el, binding) => {
-  el.style.color = binding.value
-})
+app.directive("color", (el, binding) => {
+  el.style.color = binding.value;
+});
 ```
 
 ## Object Literals
@@ -132,10 +132,13 @@ Pass multiple values:
 ```
 
 ```ts
-const vDemo = (el: HTMLElement, binding: DirectiveBinding<{ color: string; text: string }>) => {
-  console.log(binding.value.color) // 'white'
-  console.log(binding.value.text)  // 'hello'
-}
+const vDemo = (
+  el: HTMLElement,
+  binding: DirectiveBinding<{ color: string; text: string }>,
+) => {
+  console.log(binding.value.color); // 'white'
+  console.log(binding.value.text); // 'hello'
+};
 ```
 
 ## Dynamic Arguments
@@ -153,15 +156,15 @@ const vClickOutside = {
   mounted(el: HTMLElement, binding: DirectiveBinding<() => void>) {
     el._clickOutside = (event: MouseEvent) => {
       if (!el.contains(event.target as Node)) {
-        binding.value()
+        binding.value();
       }
-    }
-    document.addEventListener('click', el._clickOutside)
+    };
+    document.addEventListener("click", el._clickOutside);
   },
   unmounted(el: HTMLElement) {
-    document.removeEventListener('click', el._clickOutside)
-  }
-}
+    document.removeEventListener("click", el._clickOutside);
+  },
+};
 ```
 
 ### v-tooltip
@@ -169,12 +172,12 @@ const vClickOutside = {
 ```ts
 const vTooltip = {
   mounted(el: HTMLElement, binding: DirectiveBinding<string>) {
-    el.setAttribute('title', binding.value)
+    el.setAttribute("title", binding.value);
   },
   updated(el: HTMLElement, binding: DirectiveBinding<string>) {
-    el.setAttribute('title', binding.value)
-  }
-}
+    el.setAttribute("title", binding.value);
+  },
+};
 ```
 
 ### v-permission
@@ -183,31 +186,31 @@ const vTooltip = {
 const vPermission = {
   mounted(el: HTMLElement, binding: DirectiveBinding<string>) {
     if (!hasPermission(binding.value)) {
-      el.parentNode?.removeChild(el)
+      el.parentNode?.removeChild(el);
     }
-  }
-}
+  },
+};
 ```
 
 ## TypeScript: Global Directives
 
 ```ts
 // directives/highlight.ts
-import type { Directive } from 'vue'
+import type { Directive } from "vue";
 
-export type HighlightDirective = Directive<HTMLElement, string>
+export type HighlightDirective = Directive<HTMLElement, string>;
 
-declare module 'vue' {
+declare module "vue" {
   export interface ComponentCustomProperties {
-    vHighlight: HighlightDirective
+    vHighlight: HighlightDirective;
   }
 }
 
 export default {
   mounted: (el, binding) => {
-    el.style.backgroundColor = binding.value
-  }
-} satisfies HighlightDirective
+    el.style.backgroundColor = binding.value;
+  },
+} satisfies HighlightDirective;
 ```
 
 ## Usage on Components

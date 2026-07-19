@@ -6,11 +6,10 @@ Route middleware runs during application navigation. Put named middleware in `ap
 
 ```ts
 export default defineNuxtRouteMiddleware(async (to) => {
-  const session = useSession()
+  const session = useSession();
 
-  if (!session.value && to.path !== '/login')
-    return navigateTo('/login')
-})
+  if (!session.value && to.path !== "/login") return navigateTo("/login");
+});
 ```
 
 Return the result of `navigateTo(...)` or `abortNavigation(...)`; do not call them and then continue. Use `to` and `from` inside middleware because `useRoute()` may represent a different navigation state.
@@ -25,16 +24,16 @@ Nuxt scans top-level files in `app/plugins/`. Use `.client` or `.server` suffixe
 
 ```ts
 export default defineNuxtPlugin({
-  name: 'analytics',
+  name: "analytics",
   parallel: true,
-  setup () {
-    const analytics = createAnalyticsClient()
+  setup() {
+    const analytics = createAnalyticsClient();
 
     return {
       provide: { analytics },
-    }
+    };
   },
-})
+});
 ```
 
 Object-syntax plugin properties are statically analyzed, so keep fields such as `name`, `enforce`, `parallel`, `dependsOn`, and hook names static. Use `dependsOn` only for a real ordering dependency; otherwise independent plugins may initialize in parallel.
@@ -49,13 +48,13 @@ Register app hooks in an object-syntax plugin when they are part of plugin setup
 
 ```ts
 export default defineNuxtPlugin({
-  name: 'navigation-metrics',
+  name: "navigation-metrics",
   hooks: {
-    'page:finish' () {
-      recordPageReady()
+    "page:finish"() {
+      recordPageReady();
     },
   },
-})
+});
 ```
 
 Use `nuxtApp.hook(...)` for dynamic registration. Keep hooks small and remove external listeners when the owning scope is disposed.

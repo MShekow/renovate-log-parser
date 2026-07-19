@@ -36,12 +36,12 @@ Use Nuxt-owned primitives for Nuxt lifecycle, rendering, routing, and server beh
 
 ```vue
 <script setup lang="ts">
-const { data: products, status, error } = await useFetch('/api/products')
+const { data: products, status, error } = await useFetch("/api/products");
 
 useSeoMeta({
-  title: 'Products',
-  description: 'Browse the product catalog.',
-})
+  title: "Products",
+  description: "Browse the product catalog.",
+});
 </script>
 
 <template>

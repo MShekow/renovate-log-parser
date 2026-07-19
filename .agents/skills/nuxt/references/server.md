@@ -17,19 +17,19 @@ Suffix route files with an HTTP method when appropriate: `server/api/products/[i
 ## Validate at the boundary
 
 ```ts
-import { z } from 'zod'
+import { z } from "zod";
 
 const ProductInput = z.object({
   name: z.string().min(1),
   price: z.number().nonnegative(),
-})
+});
 
 export default defineEventHandler(async (event) => {
-  const input = await readValidatedBody(event, ProductInput.parse)
-  const product = await createProduct(input)
+  const input = await readValidatedBody(event, ProductInput.parse);
+  const product = await createProduct(input);
 
-  return { product }
-})
+  return { product };
+});
 ```
 
 Use `getValidatedQuery`, `getValidatedRouterParams`, or the corresponding H3 validation helper for other request inputs. Throw `createError` with an accurate status code for expected failures. Treat headers, cookies, route params, query values, and request bodies as untrusted even when TypeScript says otherwise.

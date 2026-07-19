@@ -8,13 +8,16 @@
 
 ```vue
 <script setup lang="ts">
-const page = ref(1)
+const page = ref(1);
 
-const { data, status, error, execute, clear } = await useFetch('/api/products', {
-  query: { page },
-  immediate: false,
-  watch: false,
-})
+const { data, status, error, execute, clear } = await useFetch(
+  "/api/products",
+  {
+    query: { page },
+    immediate: false,
+    watch: false,
+  },
+);
 </script>
 ```
 
@@ -25,10 +28,10 @@ const { data, status, error, execute, clear } = await useFetch('/api/products', 
 Give reusable `useAsyncData` wrappers an explicit stable key. Calls sharing a key also share state, so keep their handler and structural options consistent.
 
 ```ts
-export function useCatalog () {
-  return useAsyncData('catalog', (_nuxtApp, { signal }) => {
-    return $fetch('/api/catalog', { signal })
-  })
+export function useCatalog() {
+  return useAsyncData("catalog", (_nuxtApp, { signal }) => {
+    return $fetch("/api/catalog", { signal });
+  });
 }
 ```
 
@@ -43,7 +46,8 @@ For relative server requests during SSR, `useFetch` uses the current request con
 Use `useState` for SSR-safe state shared by components in one Nuxt application request. Its initializer must be serializable and side-effect-free.
 
 ```ts
-export const useSelectedTeam = () => useState<string | null>('selected-team', () => null)
+export const useSelectedTeam = () =>
+  useState<string | null>("selected-team", () => null);
 ```
 
 Use a dedicated store when the domain needs actions, persistence, or richer organization. Use `useHydration` only in plugins or modules that must transfer custom server state into the client payload; application data normally belongs in `useFetch`, `useAsyncData`, or `useState`.

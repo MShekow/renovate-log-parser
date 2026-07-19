@@ -12,19 +12,19 @@ Provide data from ancestor components to any descendant, avoiding prop drilling.
 ```vue
 <!-- Provider.vue -->
 <script setup lang="ts">
-import { provide, ref } from 'vue'
+import { provide, ref } from "vue";
 
-const message = ref('hello')
-provide('message', message)
+const message = ref("hello");
+provide("message", message);
 </script>
 ```
 
 ```vue
 <!-- DeepChild.vue (any level deep) -->
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject } from "vue";
 
-const message = inject('message')
+const message = inject("message");
 </script>
 ```
 
@@ -34,30 +34,30 @@ Use `InjectionKey` for type safety between provider and injector:
 
 ```ts
 // keys.ts
-import type { InjectionKey, Ref } from 'vue'
+import type { InjectionKey, Ref } from "vue";
 
-export const messageKey = Symbol() as InjectionKey<Ref<string>>
-export const countKey = Symbol() as InjectionKey<number>
+export const messageKey = Symbol() as InjectionKey<Ref<string>>;
+export const countKey = Symbol() as InjectionKey<number>;
 ```
 
 ```vue
 <!-- Provider.vue -->
 <script setup lang="ts">
-import { provide, ref } from 'vue'
-import { messageKey } from './keys'
+import { provide, ref } from "vue";
+import { messageKey } from "./keys";
 
-const message = ref('hello')
-provide(messageKey, message)
+const message = ref("hello");
+provide(messageKey, message);
 </script>
 ```
 
 ```vue
 <!-- Injector.vue -->
 <script setup lang="ts">
-import { inject } from 'vue'
-import { messageKey } from './keys'
+import { inject } from "vue";
+import { messageKey } from "./keys";
 
-const message = inject(messageKey) // Ref<string> | undefined
+const message = inject(messageKey); // Ref<string> | undefined
 </script>
 ```
 
@@ -65,10 +65,10 @@ const message = inject(messageKey) // Ref<string> | undefined
 
 ```ts
 // Simple default
-const value = inject('message', 'default value')
+const value = inject("message", "default value");
 
 // Factory function (for expensive defaults)
-const value = inject('key', () => new ExpensiveClass(), true)
+const value = inject("key", () => new ExpensiveClass(), true);
 //                                                       ^ treat as factory
 ```
 
@@ -78,10 +78,10 @@ Available to all components:
 
 ```ts
 // main.ts
-import { createApp } from 'vue'
+import { createApp } from "vue";
 
-const app = createApp(App)
-app.provide('globalConfig', { theme: 'dark' })
+const app = createApp(App);
+app.provide("globalConfig", { theme: "dark" });
 ```
 
 ## Reactive Provide/Inject
@@ -91,10 +91,10 @@ Provide reactive values for automatic updates:
 ```vue
 <!-- Provider.vue -->
 <script setup lang="ts">
-import { provide, ref } from 'vue'
+import { provide, ref } from "vue";
 
-const count = ref(0)
-provide('count', count)
+const count = ref(0);
+provide("count", count);
 </script>
 ```
 
@@ -107,27 +107,27 @@ Keep mutations in the provider, expose update functions:
 ```vue
 <!-- Provider.vue -->
 <script setup lang="ts">
-import { provide, ref, readonly } from 'vue'
+import { provide, ref, readonly } from "vue";
 
-const location = ref('North Pole')
+const location = ref("North Pole");
 
 function updateLocation(newLocation: string) {
-  location.value = newLocation
+  location.value = newLocation;
 }
 
-provide('location', {
+provide("location", {
   location: readonly(location), // Prevent direct mutation
-  updateLocation
-})
+  updateLocation,
+});
 </script>
 ```
 
 ```vue
 <!-- Injector.vue -->
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject } from "vue";
 
-const { location, updateLocation } = inject('location')!
+const { location, updateLocation } = inject("location")!;
 </script>
 
 <template>
@@ -143,28 +143,28 @@ Recommended for libraries and large apps to avoid collisions:
 
 ```ts
 // keys.ts
-export const myKey = Symbol('myKey')
+export const myKey = Symbol("myKey");
 
 // provider
-provide(myKey, value)
+provide(myKey, value);
 
 // injector
-inject(myKey)
+inject(myKey);
 ```
 
 ## Type Helpers
 
 ```ts
 // String key with explicit type
-const foo = inject<string>('foo')
+const foo = inject<string>("foo");
 //    ^? string | undefined
 
 // With default (removes undefined)
-const foo = inject<string>('foo', 'default')
+const foo = inject<string>("foo", "default");
 //    ^? string
 
 // Force non-undefined (use when certain it's provided)
-const foo = inject('foo') as string
+const foo = inject("foo") as string;
 ```
 
 <!--

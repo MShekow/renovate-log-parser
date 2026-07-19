@@ -8,17 +8,17 @@ Keep `nuxt.config.ts` declarative and use the narrowest configuration owner. Mod
 export default defineNuxtConfig({
   modules: [],
   runtimeConfig: {
-    apiSecret: '',
+    apiSecret: "",
     public: {
-      apiBase: '/api',
+      apiBase: "/api",
     },
   },
   routeRules: {
-    '/': { prerender: true },
-    '/admin/**': { ssr: false },
-    '/old': { redirect: '/new' },
+    "/": { prerender: true },
+    "/admin/**": { ssr: false },
+    "/old": { redirect: "/new" },
   },
-})
+});
 ```
 
 Preserve the repository's established `compatibilityDate`; do not update it incidentally because it can change Nitro behavior. Add one from the current Nuxt guidance when a project does not have it, then treat later changes as deliberate upgrades. Treat `future.compatibilityVersion` as an opt-in migration test and verify the entire application before keeping it.

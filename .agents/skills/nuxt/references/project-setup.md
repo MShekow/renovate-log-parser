@@ -56,29 +56,29 @@ Read the release and migration notes across the actual version range, regenerate
 Use `@nuxt/test-utils` when a test needs the Nuxt runtime. Keep pure functions in an ordinary Node unit project because it is faster and avoids global Nuxt state.
 
 ```ts
-import { defineConfig } from 'vitest/config'
-import { defineVitestProject } from '@nuxt/test-utils/config'
+import { defineConfig } from "vitest/config";
+import { defineVitestProject } from "@nuxt/test-utils/config";
 
 export default defineConfig({
   test: {
     projects: [
       {
         test: {
-          name: 'unit',
-          include: ['test/unit/**/*.test.ts'],
-          environment: 'node',
+          name: "unit",
+          include: ["test/unit/**/*.test.ts"],
+          environment: "node",
         },
       },
       await defineVitestProject({
         test: {
-          name: 'nuxt',
-          include: ['test/nuxt/**/*.test.ts'],
-          environment: 'nuxt',
+          name: "nuxt",
+          include: ["test/nuxt/**/*.test.ts"],
+          environment: "nuxt",
         },
       }),
     ],
   },
-})
+});
 ```
 
 Use `mountSuspended` or `renderSuspended` for components that depend on Nuxt injections, async setup, routing, or auto-imports. Use `setup`, `$fetch`, and browser helpers from `@nuxt/test-utils/e2e` for full application behavior. Do not mix Nuxt-runtime and end-to-end helpers in the same test environment.

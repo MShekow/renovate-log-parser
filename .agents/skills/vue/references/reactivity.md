@@ -12,21 +12,21 @@ Vue's reactivity system enables automatic tracking of state changes and DOM upda
 Create reactive primitive values with `ref()`. Access/modify via `.value` in JavaScript, auto-unwrapped in templates.
 
 ```ts
-import { ref } from 'vue'
+import { ref } from "vue";
 
-const count = ref(0)
-console.log(count.value) // 0
-count.value++
+const count = ref(0);
+console.log(count.value); // 0
+count.value++;
 ```
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref } from "vue";
 
-const count = ref(0)
+const count = ref(0);
 
 function increment() {
-  count.value++
+  count.value++;
 }
 </script>
 
@@ -38,17 +38,17 @@ function increment() {
 ### Typing refs
 
 ```ts
-import { ref } from 'vue'
-import type { Ref } from 'vue'
+import { ref } from "vue";
+import type { Ref } from "vue";
 
 // Type inference
-const year = ref(2020) // Ref<number>
+const year = ref(2020); // Ref<number>
 
 // Explicit generic
-const name = ref<string | null>(null)
+const name = ref<string | null>(null);
 
 // Ref type annotation
-const id: Ref<string | number> = ref('abc')
+const id: Ref<string | number> = ref("abc");
 ```
 
 ## reactive()
@@ -56,19 +56,19 @@ const id: Ref<string | number> = ref('abc')
 Create reactive objects. No `.value` needed, but cannot reassign the entire object.
 
 ```ts
-import { reactive } from 'vue'
+import { reactive } from "vue";
 
 interface State {
-  count: number
-  name: string
+  count: number;
+  name: string;
 }
 
 const state: State = reactive({
   count: 0,
-  name: 'Vue'
-})
+  name: "Vue",
+});
 
-state.count++ // reactive
+state.count++; // reactive
 ```
 
 ### Limitations of reactive()
@@ -78,14 +78,14 @@ state.count++ // reactive
 3. **Destructuring loses reactivity** - use `toRefs()` instead
 
 ```ts
-const state = reactive({ count: 0 })
+const state = reactive({ count: 0 });
 
 // ❌ Loses reactivity
-let { count } = state
+let { count } = state;
 
 // ✅ Use toRefs
-import { toRefs } from 'vue'
-const { count } = toRefs(state)
+import { toRefs } from "vue";
+const { count } = toRefs(state);
 ```
 
 ## Recommendation
@@ -99,12 +99,12 @@ Both `ref()` and `reactive()` are deeply reactive by default:
 ```ts
 const obj = ref({
   nested: { count: 0 },
-  arr: ['foo', 'bar']
-})
+  arr: ["foo", "bar"],
+});
 
 // These trigger updates
-obj.value.nested.count++
-obj.value.arr.push('baz')
+obj.value.nested.count++;
+obj.value.arr.push("baz");
 ```
 
 Use `shallowRef()` or `shallowReactive()` to opt out of deep reactivity for performance.
@@ -114,13 +114,13 @@ Use `shallowRef()` or `shallowReactive()` to opt out of deep reactivity for perf
 DOM updates are batched and asynchronous. Use `nextTick()` to wait for updates:
 
 ```ts
-import { ref, nextTick } from 'vue'
+import { ref, nextTick } from "vue";
 
-const count = ref(0)
+const count = ref(0);
 
 async function increment() {
-  count.value++
-  await nextTick()
+  count.value++;
+  await nextTick();
   // DOM is now updated
 }
 ```
@@ -132,13 +132,13 @@ async function increment() {
 - **In arrays/collections**: Refs do NOT auto-unwrap
 
 ```ts
-const count = ref(0)
-const state = reactive({ count })
+const count = ref(0);
+const state = reactive({ count });
 
-console.log(state.count) // 0 (unwrapped)
+console.log(state.count); // 0 (unwrapped)
 
-const books = reactive([ref('Vue Guide')])
-console.log(books[0].value) // Need .value
+const books = reactive([ref("Vue Guide")]);
+console.log(books[0].value); // Need .value
 ```
 
 ## computed()
@@ -146,23 +146,23 @@ console.log(books[0].value) // Need .value
 Derive values from reactive state with automatic caching. Only re-evaluates when dependencies change.
 
 ```ts
-import { ref, computed } from 'vue'
+import { ref, computed } from "vue";
 
-const firstName = ref('John')
-const lastName = ref('Doe')
+const firstName = ref("John");
+const lastName = ref("Doe");
 
 // Readonly computed
-const fullName = computed(() => `${firstName.value} ${lastName.value}`)
+const fullName = computed(() => `${firstName.value} ${lastName.value}`);
 
 // Writable computed
 const fullNameWritable = computed({
   get() {
-    return `${firstName.value} ${lastName.value}`
+    return `${firstName.value} ${lastName.value}`;
   },
   set(newValue: string) {
-    [firstName.value, lastName.value] = newValue.split(' ')
-  }
-})
+    [firstName.value, lastName.value] = newValue.split(" ");
+  },
+});
 ```
 
 ### Computed Best Practices
@@ -173,11 +173,11 @@ const fullNameWritable = computed({
 
 ```ts
 // ✅ Cached - only recalculates when items changes
-const activeItems = computed(() => items.value.filter(x => x.active))
+const activeItems = computed(() => items.value.filter((x) => x.active));
 
 // ❌ Not cached - runs on every render
 function getActiveItems() {
-  return items.value.filter(x => x.active)
+  return items.value.filter((x) => x.active);
 }
 ```
 
@@ -186,43 +186,46 @@ function getActiveItems() {
 Explicitly watch reactive sources and run side effects when they change. Lazy by default.
 
 ```ts
-import { ref, watch } from 'vue'
+import { ref, watch } from "vue";
 
-const id = ref(1)
+const id = ref(1);
 
 watch(id, async (newId, oldId) => {
-  const data = await fetchData(newId)
+  const data = await fetchData(newId);
   // handle data...
-})
+});
 ```
 
 ### Watch Source Types
 
 ```ts
-const x = ref(0)
-const obj = reactive({ count: 0 })
+const x = ref(0);
+const obj = reactive({ count: 0 });
 
 // Single ref
-watch(x, (newX) => console.log(newX))
+watch(x, (newX) => console.log(newX));
 
 // Getter function
-watch(() => obj.count, (count) => console.log(count))
+watch(
+  () => obj.count,
+  (count) => console.log(count),
+);
 
 // Multiple sources
 watch([x, () => obj.count], ([newX, newCount]) => {
-  console.log(newX, newCount)
-})
+  console.log(newX, newCount);
+});
 ```
 
 ### Watch Options
 
 ```ts
 watch(source, callback, {
-  immediate: true,  // Run immediately on creation
-  deep: true,       // Watch nested properties
-  once: true,       // Trigger only once (3.4+)
-  flush: 'post'     // Run after DOM update
-})
+  immediate: true, // Run immediately on creation
+  deep: true, // Watch nested properties
+  once: true, // Trigger only once (3.4+)
+  flush: "post", // Run after DOM update
+});
 ```
 
 ## watchEffect()
@@ -230,15 +233,15 @@ watch(source, callback, {
 Automatically tracks dependencies and runs immediately. Re-runs when any tracked dependency changes.
 
 ```ts
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect } from "vue";
 
-const todoId = ref(1)
-const data = ref(null)
+const todoId = ref(1);
+const data = ref(null);
 
 watchEffect(async () => {
-  const response = await fetch(`/api/todos/${todoId.value}`)
-  data.value = await response.json()
-})
+  const response = await fetch(`/api/todos/${todoId.value}`);
+  data.value = await response.json();
+});
 ```
 
 ### watch vs watchEffect
@@ -255,29 +258,33 @@ watchEffect(async () => {
 Cancel stale async operations:
 
 ```ts
-import { watch, onWatcherCleanup } from 'vue'
+import { watch, onWatcherCleanup } from "vue";
 
 watch(id, async (newId) => {
-  const controller = new AbortController()
+  const controller = new AbortController();
 
-  fetch(`/api/${newId}`, { signal: controller.signal })
+  fetch(`/api/${newId}`, { signal: controller.signal });
 
-  onWatcherCleanup(() => controller.abort())
-})
+  onWatcherCleanup(() => controller.abort());
+});
 ```
 
 ## Stopping Watchers
 
 ```ts
-const stop = watch(source, callback)
-const stop2 = watchEffect(() => { /* ... */ })
+const stop = watch(source, callback);
+const stop2 = watchEffect(() => {
+  /* ... */
+});
 
 // Stop manually
-stop()
-stop2()
+stop();
+stop2();
 
 // Pause/Resume (3.5+)
-const { stop, pause, resume } = watchEffect(() => { /* ... */ })
+const { stop, pause, resume } = watchEffect(() => {
+  /* ... */
+});
 ```
 
 <!--

@@ -23,10 +23,10 @@ Use the compile-time `definePageMeta` macro inside a page:
 ```vue
 <script setup lang="ts">
 definePageMeta({
-  layout: 'dashboard',
-  middleware: ['auth'],
-  validate: route => typeof route.params.id === 'string',
-})
+  layout: "dashboard",
+  middleware: ["auth"],
+  validate: (route) => typeof route.params.id === "string",
+});
 </script>
 ```
 

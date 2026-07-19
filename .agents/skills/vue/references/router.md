@@ -10,13 +10,13 @@ Extend `RouteMeta` for typed route.meta:
 
 ```ts
 // router/types.ts
-import 'vue-router'
+import "vue-router";
 
-declare module 'vue-router' {
+declare module "vue-router" {
   interface RouteMeta {
-    requiresAuth?: boolean
-    title?: string
-    roles?: ('admin' | 'user')[]
+    requiresAuth?: boolean;
+    title?: string;
+    roles?: ("admin" | "user")[];
   }
 }
 ```
@@ -24,9 +24,9 @@ declare module 'vue-router' {
 **Usage:**
 
 ```ts
-const route = useRoute()
-route.meta.requiresAuth // boolean | undefined (typed!)
-route.meta.title // string | undefined
+const route = useRoute();
+route.meta.requiresAuth; // boolean | undefined (typed!)
+route.meta.title; // string | undefined
 ```
 
 ## Typed Route Params with unplugin-vue-router
@@ -39,34 +39,34 @@ pnpm add -D unplugin-vue-router
 
 ```ts
 // vite.config.ts
-import VueRouter from 'unplugin-vue-router/vite'
+import VueRouter from "unplugin-vue-router/vite";
 
 export default defineConfig({
   plugins: [VueRouter(), Vue()], // VueRouter BEFORE Vue
-})
+});
 ```
 
 **Typed useRoute:**
 
 ```ts
 // Auto-generated route types from file structure
-const route = useRoute('/users/[id]')
-route.params.id // string (typed!)
+const route = useRoute("/users/[id]");
+route.params.id; // string (typed!)
 
-const route = useRoute('/posts/[...slug]')
-route.params.slug // string[] (typed!)
+const route = useRoute("/posts/[...slug]");
+route.params.slug; // string[] (typed!)
 ```
 
 **Typed router.push:**
 
 ```ts
-const router = useRouter()
+const router = useRouter();
 
 // ✅ Type-checked
-router.push({ name: '/users/[id]', params: { id: '123' } })
+router.push({ name: "/users/[id]", params: { id: "123" } });
 
 // ❌ TypeScript error - wrong param
-router.push({ name: '/users/[id]', params: { userId: '123' } })
+router.push({ name: "/users/[id]", params: { userId: "123" } });
 ```
 
 ## Scroll Behavior Types
@@ -74,19 +74,19 @@ router.push({ name: '/users/[id]', params: { userId: '123' } })
 Type scroll behavior function:
 
 ```ts
-import type { RouterScrollBehavior } from 'vue-router'
+import type { RouterScrollBehavior } from "vue-router";
 
 const scrollBehavior: RouterScrollBehavior = (to, from, savedPosition) => {
-  if (savedPosition) return savedPosition
-  if (to.hash) return { el: to.hash, behavior: 'smooth' }
-  return { top: 0 }
-}
+  if (savedPosition) return savedPosition;
+  if (to.hash) return { el: to.hash, behavior: "smooth" };
+  return { top: 0 };
+};
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior,
-})
+});
 ```
 
 ## Dynamic Route Params
@@ -95,15 +95,15 @@ Handle union types for dynamic segments:
 
 ```ts
 // routes/[type].vue where type can be 'posts' | 'users' | 'comments'
-const route = useRoute()
+const route = useRoute();
 
 // Narrow params type
-type ContentType = 'posts' | 'users' | 'comments'
+type ContentType = "posts" | "users" | "comments";
 
-const type = route.params.type as ContentType
+const type = route.params.type as ContentType;
 
 // Or use route guards
-if (route.params.type === 'posts') {
+if (route.params.type === "posts") {
   // TypeScript knows type is 'posts'
 }
 ```
@@ -113,15 +113,18 @@ if (route.params.type === 'posts') {
 Type navigation guards:
 
 ```ts
-import type { NavigationGuardWithThis, RouteLocationNormalized } from 'vue-router'
+import type {
+  NavigationGuardWithThis,
+  RouteLocationNormalized,
+} from "vue-router";
 
 const authGuard: NavigationGuardWithThis<undefined> = (to, from) => {
   if (to.meta.requiresAuth && !isAuthenticated()) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+    return { name: "login", query: { redirect: to.fullPath } };
   }
-}
+};
 
-router.beforeEach(authGuard)
+router.beforeEach(authGuard);
 ```
 
 **Per-route guards:**
@@ -129,13 +132,13 @@ router.beforeEach(authGuard)
 ```ts
 const routes = [
   {
-    path: '/admin',
+    path: "/admin",
     component: AdminPage,
     beforeEnter: (to: RouteLocationNormalized) => {
-      if (!hasAdminRole()) return { name: 'forbidden' }
+      if (!hasAdminRole()) return { name: "forbidden" };
     },
   },
-]
+];
 ```
 
 ## RouteLocation Types
@@ -144,11 +147,11 @@ Common route types:
 
 ```ts
 import type {
-  RouteLocationNormalized,     // Resolved route (after navigation)
+  RouteLocationNormalized, // Resolved route (after navigation)
   RouteLocationNormalizedLoaded, // Current route (from useRoute)
-  RouteLocationRaw,            // Input to router.push()
-  RouteRecordRaw,              // Route config definition
-} from 'vue-router'
+  RouteLocationRaw, // Input to router.push()
+  RouteRecordRaw, // Route config definition
+} from "vue-router";
 ```
 
 ## Common Mistakes
@@ -157,11 +160,13 @@ import type {
 
 ```ts
 // ❌ Loses type info
-route.meta.customField // any
+route.meta.customField; // any
 
 // ✅ Extend the interface
-declare module 'vue-router' {
-  interface RouteMeta { customField: string }
+declare module "vue-router" {
+  interface RouteMeta {
+    customField: string;
+  }
 }
 ```
 
@@ -169,13 +174,13 @@ declare module 'vue-router' {
 
 ```ts
 // Catch-all routes have string[] params
-const route = useRoute()
+const route = useRoute();
 
 // ❌ May be string[]
-const id = route.params.id
+const id = route.params.id;
 
 // ✅ Handle both cases
 const id = Array.isArray(route.params.id)
   ? route.params.id[0]
-  : route.params.id
+  : route.params.id;
 ```
