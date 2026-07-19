@@ -37,11 +37,11 @@ Starts the bundled [Nuxt](https://nuxt.com) web UI (with [Nuxt UI](https://ui.nu
 and Nuxt's built-in Nitro server). The demo page is server-rendered and fetches
 live data from the `/api/hello` Nitro route.
 
-| Option     | Default     | Description                        |
-| ---------- | ----------- | ---------------------------------- |
-| `--port`   | `3000`      | Port to listen on                  |
-| `--host`   | `localhost` | Host to bind to                    |
-| `--open`   | `true`      | Open the web UI in your browser    |
+| Option   | Default     | Description                     |
+| -------- | ----------- | ------------------------------- |
+| `--port` | `3000`      | Port to listen on               |
+| `--host` | `localhost` | Host to bind to                 |
+| `--open` | `true`      | Open the web UI in your browser |
 
 ```bash
 renovate-log-parser web --port 4000 --no-open
@@ -69,6 +69,19 @@ npm run build
 # Run the compiled CLI
 node dist/cli.js --help
 ```
+
+### Linting & formatting
+
+[ESLint](https://eslint.org) (flat config) and [Prettier](https://prettier.io) are set up at the workspace root.
+
+```bash
+npm run lint          # ESLint for src/ (type-aware) + web/ (Nuxt rules)
+npm run format        # Prettier write pass over all non-ignored files
+npm run format:check  # Prettier check (no writes — useful in CI)
+```
+
+- **Root (`src/`)** — [`eslint.config.mjs`](./eslint.config.mjs) uses `typescript-eslint` `recommendedTypeChecked` rules against `src/**/*.ts`, with `eslint-config-prettier` appended to disable any rules that conflict with Prettier. Prettier itself runs with its defaults (semicolons, double quotes, trailing commas).
+- **Web (`web/`)** — [`web/eslint.config.mjs`](./web/eslint.config.mjs) delegates to the auto-generated `@nuxt/eslint` config, which covers Vue, TypeScript, and Nuxt-specific rules. The `web/` directory is excluded from the root ESLint and Prettier configs so the two setups stay independent.
 
 ### How it's built
 

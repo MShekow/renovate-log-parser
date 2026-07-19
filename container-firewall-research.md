@@ -10,9 +10,11 @@ Two of the most common and robust methods to achieve this are:
 ---
 
 ### Method 1: Egress Proxy (Squid)
+
 This method is reliable because HTTP clients using HTTPS will send a `CONNECT` request to the proxy containing the destination domain name in plain text (e.g., `CONNECT github.com:443`). The proxy can block this request before the encrypted TLS session is established, without needing to decrypt the traffic or install custom certificates on the client.
 
 #### Step 1: Set up the Squid Proxy
+
 You can run Squid in a container. Create a configuration file named `squid.conf`:
 
 ```text
@@ -30,6 +32,7 @@ http_access allow all
 ```
 
 Run the Squid container on a shared Docker network:
+
 ```bash
 docker network create proxy-net
 
@@ -41,6 +44,7 @@ docker run -d \
 ```
 
 #### Step 2: Configure your Application Container
+
 Run your application container on the same network and configure it to use the proxy via standard environment variables:
 
 ```bash
@@ -52,17 +56,20 @@ docker run -it --rm \
 ```
 
 **Testing inside the container:**
-* Allowed domain: `curl -I https://www.google.com` (Should succeed)
-* Blocked domain: `curl -I https://www.instagram.com` (Should return a `403 Forbidden` error from the proxy)
+
+- Allowed domain: `curl -I https://www.google.com` (Should succeed)
+- Blocked domain: `curl -I https://www.instagram.com` (Should return a `403 Forbidden` error from the proxy)
 
 **Limitations:** The target container's application must respect the `http_proxy` and `https_proxy` environment variables.
 
 ---
 
 ### Method 2: DNS Sinkholing + Firewall Locking
+
 If the application inside your container does not support proxy environment variables, you can intercept its DNS queries.
 
 #### Step 1: Run a Local DNS Server (e.g., dnsmasq)
+
 Create a `dnsmasq.conf` file to resolve blocked domains to an unreachable IP (like `0.0.0.0`):
 
 ```text
@@ -76,6 +83,7 @@ address=/facebook.com/0.0.0.0
 ```
 
 Run the DNS container on a bridge network (e.g., the default bridge or a custom one):
+
 ```bash
 docker run -d \
   --name dns-filter \
@@ -83,9 +91,11 @@ docker run -d \
   --cap-add=NET_ADMIN \
   andysh/dnsmasq:latest
 ```
-*Note the internal IP address of this container (e.g., `172.17.0.2`).*
+
+_Note the internal IP address of this container (e.g., `172.17.0.2`)._
 
 #### Step 2: Run the Target Container using the Filtered DNS
+
 Launch your application container, forcing it to use the `dns-filter` container for DNS resolution:
 
 ```bash
@@ -95,6 +105,7 @@ docker run -it --rm \
 ```
 
 #### Step 3: Prevent DNS Bypass via iptables (Optional but Recommended)
+
 A sophisticated container or user might attempt to bypass the DNS server by querying public DNS (like `8.8.8.8`) directly over port 53. To prevent this, you can apply an `iptables` rule on the host to block all outbound DNS traffic from the container except to your DNS filter.
 
 Find the IP of your target container (e.g., `172.17.0.3`) and run on the host:
@@ -115,10 +126,10 @@ iptables -A FORWARD -s 172.17.0.3 -p tcp --dport 53 -j DROP
 
 ### Summary of trade-offs
 
-* **Egress Proxy (Squid):** More robust against IP changes and direct IP connections, but relies on the container's application honoring proxy settings.
-* **DNS Sinkhole:** Works transparently for any application without configuration changes, but can be bypassed if the application uses hardcoded IP addresses instead of domain names.
+- **Egress Proxy (Squid):** More robust against IP changes and direct IP connections, but relies on the container's application honoring proxy settings.
+- **DNS Sinkhole:** Works transparently for any application without configuration changes, but can be bypassed if the application uses hardcoded IP addresses instead of domain names.
 
-----
+---
 
 User:
 By "blocked", I mean that I want to simulate a firewall that instead returns dummy HTML pages with a self-signed TLS certificate:
@@ -131,6 +142,7 @@ Because TLS/HTTPS is designed to prevent exactly this scenario, modern HTTP clie
 Here is a step-by-step implementation using **Nginx** as the dummy server and **DNS redirection**.
 
 ### Step 1: Create a Custom Certificate Authority (CA) and Server Certificate
+
 To prevent having to manage individual self-signed certificates for every blocked domain, we will create a local Certificate Authority (CA). We will use this CA to sign a wildcard certificate for the blocked domains.
 
 On your host machine, run the following commands to generate the certificates:
@@ -182,6 +194,7 @@ openssl x509 -req -in dummy-server.csr -CA MyLocalCA.pem -CAkey MyLocalCA.key \
 ---
 
 ### Step 2: Set up the Nginx Dummy Server
+
 Create an Nginx configuration file named `nginx.conf`:
 
 ```nginx
@@ -223,15 +236,19 @@ docker run -d \
 ---
 
 ### Step 3: Redirect Blocked Traffic to the Dummy Server
+
 You can use dnsmasq to resolve the blocked domains to the Nginx container's IP address.
 
 First, get the IP address of the `dummy-webserver` container on the `block-net` network:
+
 ```bash
 docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' dummy-webserver
 ```
-*(Assuming the IP returned is `172.18.0.2`)*
+
+_(Assuming the IP returned is `172.18.0.2`)_
 
 Create a `dnsmasq.conf` file:
+
 ```text
 server=1.1.1.1
 # Point the blocked domains to the dummy Nginx container
@@ -240,6 +257,7 @@ address=/facebook.com/172.18.0.2
 ```
 
 Run the DNS server container on the same network:
+
 ```bash
 docker run -d \
   --name dns-interceptor \
@@ -248,7 +266,8 @@ docker run -d \
   -v $(pwd)/dnsmasq.conf:/etc/dnsmasq.conf \
   andysh/dnsmasq:latest
 ```
-*(Assuming the DNS container IP is `172.18.0.3`)*
+
+_(Assuming the DNS container IP is `172.18.0.3`)_
 
 ---
 
@@ -284,8 +303,15 @@ curl https://www.instagram.com
 ```
 
 ### Result
+
 The request to `https://www.instagram.com` will be intercepted, the TLS handshake will complete successfully because the container trusts your local CA, and `curl` will output the dummy HTML page:
 
 ```html
-<html><head><title>Access Blocked</title></head>...<h1>🚫 Access Blocked</h1>...
+<html>
+  <head>
+    <title>Access Blocked</title></head
+  >...
+  <h1>🚫 Access Blocked</h1>
+  ...
+</html>
 ```

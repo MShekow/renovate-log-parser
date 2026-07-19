@@ -13,6 +13,10 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2026-06-30',
 
+  typescript: {
+    typeCheck: true
+  },
+
   eslint: {
     config: {
       stylistic: {
@@ -20,9 +24,5 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
-  },
-
-  typescript: {
-    typeCheck: true
   }
 })
