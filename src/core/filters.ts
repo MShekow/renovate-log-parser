@@ -6,14 +6,15 @@
  * the {@link QueryBuilder} translates into parameterized SQL. Filters are always
  * AND'd together.
  *
- * Design decisions (see docs/renovate-log-parser-plan.md, Q4/Q19):
+ * Design decisions (see docs/renovate-log-parser-plan.md, Q4/Q19/Q28.1):
  *  - Only root-level JSON keys are addressable in v1 (`$.<key>`), though the
  *    helpers below already build JSON paths so nested support is a non-breaking
  *    extension later.
  *  - `equals` matches scalar (string/number/boolean) values only. Against a
  *    non-scalar value it simply does not match.
- *  - Glob search uses SQLite `GLOB` semantics (`*` and `?` wildcards,
- *    case-sensitive).
+ *  - `like` is a simple, case-insensitive wildcard match on a single field
+ *    where `*` (and only `*`) is a wildcard. It is translated to a SQLite
+ *    `LIKE ... ESCAPE` comparison (see {@link globStarToLike}).
  */
 
 /** Root-level JSON key name (e.g. `repository`, `err`, `msg`). */
@@ -21,15 +22,6 @@ export type FieldName = string;
 
 /** Scalar values usable in an `equals` filter. */
 export type ScalarValue = string | number | boolean;
-
-/**
- * Which part of the JSON entry a glob search applies to.
- *  - `key`   : match against key names only
- *  - `value` : match against leaf values only
- *  - `both`  : a single pattern matches either a key or a value
- *  - `keyValue` : distinct patterns for key and value (both must match somewhere)
- */
-export type GlobSearchMode = "key" | "value" | "both" | "keyValue";
 
 /** Match log entries where a root-level `field` equals a scalar `value`. */
 export interface EqualsFilter {
@@ -55,21 +47,23 @@ export interface LevelFilter {
   negate?: boolean;
 }
 
-/** Free-form glob search over keys and/or values via SQLite `json_tree`. */
-export interface GlobFilter {
-  type: "glob";
-  mode: GlobSearchMode;
-  /** Pattern applied to keys (modes `key`, `keyValue`). */
-  keyPattern?: string;
-  /** Pattern applied to values (modes `value`, `keyValue`). */
-  valuePattern?: string;
-  /** Single pattern applied to either key or value (mode `both`). */
-  pattern?: string;
+/**
+ * Case-insensitive wildcard match on a single root-level `field`, where `*`
+ * (and only `*`) is a wildcard. Translated to a SQLite `LIKE ... ESCAPE`
+ * comparison by the {@link QueryBuilder}. The `pattern` is the raw user glob;
+ * {@link globStarToLike} performs the escaping/translation at build time.
+ */
+export interface LikeFilter {
+  type: "like";
+  field: FieldName;
+  /** Raw user pattern where `*` matches any run of characters. */
+  pattern: string;
+  /** When true, matches entries that do NOT match the pattern. */
   negate?: boolean;
 }
 
 /** Any supported filter. All filters in a query are AND'd. */
-export type Filter = EqualsFilter | PresenceFilter | LevelFilter | GlobFilter;
+export type Filter = EqualsFilter | PresenceFilter | LevelFilter | LikeFilter;
 
 /**
  * Build a SQLite JSON path for a root-level key.
@@ -90,6 +84,21 @@ export function extractExpr(field: FieldName, column = "logentry"): string {
 
 /** Parse a `key:val` CLI filter token into an {@link EqualsFilter}. */
 export function parseKeyValueFilter(token: string): EqualsFilter {
+  const { field, value } = splitKeyValue(token);
+  return { type: "equals", field, value };
+}
+
+/**
+ * Parse a `key:pattern` CLI token into a {@link LikeFilter}, where `*` in the
+ * pattern is a wildcard (matching is case-insensitive; see {@link globStarToLike}).
+ */
+export function parseWildcardFilter(token: string): LikeFilter {
+  const { field, value } = splitKeyValue(token);
+  return { type: "like", field, pattern: value };
+}
+
+/** Split a `key:value` token on its FIRST colon, validating a non-empty key. */
+function splitKeyValue(token: string): { field: string; value: string } {
   const idx = token.indexOf(":");
   if (idx === -1) {
     throw new Error(
@@ -101,5 +110,18 @@ export function parseKeyValueFilter(token: string): EqualsFilter {
   if (field.length === 0) {
     throw new Error(`Invalid filter "${token}". The key must not be empty.`);
   }
-  return { type: "equals", field, value };
+  return { field, value };
+}
+
+/**
+ * Translate a simple `*`-only user glob into a SQLite `LIKE` pattern.
+ *
+ * `LIKE`'s own metacharacters (`%`, `_`) and the escape character (`\`) are
+ * escaped so they match literally; then `*` is mapped to `%` (any run of
+ * characters). The resulting pattern must be used with `ESCAPE '\'`. Matching
+ * is anchored exactly as written — a leading/trailing `*` is required for
+ * prefix/suffix/contains behaviour.
+ */
+export function globStarToLike(pattern: string): string {
+  return pattern.replace(/[\\%_]/g, "\\$&").replace(/\*/g, "%");
 }

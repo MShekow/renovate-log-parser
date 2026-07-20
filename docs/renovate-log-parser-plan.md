@@ -71,41 +71,41 @@ web/
 
 ## Decisions (Q# -> decision -> rationale)
 
-| Q    | Decision                                                                                                                                                                                              | Rationale                                                                       |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1    | Storage via **`node:sqlite`** (built-in), used by CLI + server                                                                                                                                        | Zero deps, no native build, present on Node ≥26                                 |
-| 2    | Single `logentry` JSON column; **expression indices** (`json_extract`) on level/repository/branch, and `err IS NOT NULL`                                                                              | Stays true to single-column spec; QueryBuilder centralizes matching expressions |
-| 3    | Malformed lines -> synthetic `{"_parseError":true,"_raw":…}` row; blank -> `{"_blank":true}`                                                                                                          | Guarantees rowid == line number; contiguous counts; surfaces corruption         |
-| 4    | Filter API: root-level keys only in v1 (JSON-path internally); `equals` matches scalars only                                                                                                          | Matches every documented example; simpler; non-breaking to extend later         |
-| 5    | Config-migration detection: broad, **provisional** case-insensitive patterns in a documented constant                                                                                                 | TBD in spec; no real "needs migration" sample available — must verify later     |
-| 6    | Machine-readable output: v1 schema, category-keyed, zero-counts included, ignored findings emitted with `ignored:true`                                                                                | Stable run-over-run CI comparison                                               |
-| 7    | Ignore file `renovate-log-parser.ignore.json` (`--ignore-file` override); match by category + optional message-glob + optional repository; optional `expires` (expired => inactive + warn) + `reason` | Line numbers shift; temporary silencing needs stable keys + expiry              |
-| 8    | Exit codes: `0` clean, `1` non-ignored errors, `2` tool/usage error; `--fail-on-warn` opt-in (no `--max-warnings`)                                                                                    | Distinguishes "analyzer broke" from "log had errors"                            |
-| 9    | `abandoned-package`: **reserve** category (count always 0), no detection yet                                                                                                                          | Keeps schema/counts forward-compatible without fabricated logic                 |
-| 10   | `level>=50` = build-breaking errors; `level:40` + `repoProblems` (de-duped vs overlapping level:40) + `branchesInformation[].result==="error"` = warnings                                             | Matches Renovate severity; avoids double counting                               |
-| 11   | `analyze` no-args: **pretty JSON** stats to stdout (`--format=text` deferred)                                                                                                                         | Primary consumer is an AI agent                                                 |
-| 12   | `analyze --print`: **JSONL** to stdout, truncation notices to stderr, `_oL` = 0-indexed line, ordering range -> filter -> limit                                                                       | Mirrors source log; stream-friendly; clean stdout                               |
-| 13   | `depNames`/`packageNames`: union of root-level keys + `packageFiles with updates` config-object dep arrays, deduped                                                                                   | Fullest dependency picture; cheap (1–2 lines/repo)                              |
-| 14   | Web server **shares** Parser + QueryBuilder + SQLite cache                                                                                                                                            | One code path; cache reuse; scales                                              |
-| 15   | Shared code at **`src/core/`**, consumed by CLI natively + Nitro via alias (inlined into `.output`)                                                                                                   | Single source of truth; honors existing 2-part layout                           |
-| 16   | GET rows: SQL filtering + `offset`/`limit` paging + client virtualization; return `total`                                                                                                             | Only option that scales to large real logs                                      |
-| 17   | Details: **3/4-width `USlideover`** + recursive collapsible JSON tree (all expanded, `msg` excluded)                                                                                                  | Matches spec; fixed row heights play well with virtualization                   |
-| 18   | One reactive filter object (static dropdowns + `enabled`-toggleable pills); stateless-per-request client state; debounced refetch; **no** URL-sync in v1                                              | Simple, matches spec's static/dynamic split                                     |
-| 19   | Free-text search: `json_tree()` + `GLOB`, 4 modes, **case-sensitive** (toggle deferred)                                                                                                               | GLOB natively supports `*`/`?`; SQL-side keeps paging valid                     |
-| 20   | Context menus: level/repo actions drive **static dropdowns**; message + JSON-field actions create **pills**; `field==value` item scalar-only                                                          | Prevents pill/dropdown contradictions                                           |
-| 21   | CLI resolves abs path -> `?log=` handoff; POST-path reads **any** local abs path (unrestricted); file-picker uses temp file + hash                                                                    | Local single-user tool                                                          |
-| 22   | **Stateful** Nitro server: in-memory registry `md5 -> {path, DatabaseSync}` + current pointer; GET routes always use current log; **no** `md5` override; loading new file replaces current            | Long-lived single-user process; reuse open handles                              |
-| 23   | Skill: generic **parameterized** `gh` recipe (placeholders), org values in a local git-ignored copy                                                                                                   | Keep published tool org-neutral                                                 |
-| 24   | Cache: `os.tmpdir()/renovate-log-parser-<md5>.db`; transactional parse (crash => 0 rows => rebuild); zero-row orphan cleanup on load; content-md5 key; no TTL/size cap in v1                          | Robust, simple                                                                  |
-| 25   | Tests: `node:test`, **stubs only** — no real log committed (sample is private)                                                                                                                        | User adds committable fixtures later                                            |
-| 26   | Level glyphs `T/D/I/W/E/F`; **info=green**, warn=amber, error=red, fatal=red-filled, trace/debug=muted; unknown => raw number                                                                         | Per spec + user preference                                                      |
-| 27   | Both `detect-errors` and `analyze` **require an explicit path**                                                                                                                                       | Predictable; no magic default filename                                          |
-| 28.1 | `analyze --filter key:val` = scalar equals on root key, repeatable, AND'd                                                                                                                             | Shared primitive                                                                |
-| 28.2 | `detect-errors` analyzes whole log across all repos; findings carry `repository` when present                                                                                                         | —                                                                               |
-| 28.3 | Web repo dropdown lists distinct `repository` verbatim (incl. git-URL sub-repos) + "Repository-independent" pseudo-entry                                                                              | —                                                                               |
-| 28.4 | Analyzer identifies dependency `config` strictly by `msg === "packageFiles with updates"`                                                                                                             | Avoid confusing with `File config` etc.                                         |
-| 28.5 | Do **not** gitignore the private sample files                                                                                                                                                         | User's choice                                                                   |
-| 28.6 | `node:sqlite` needs **no** experimental flag                                                                                                                                                          | User verified                                                                   |
+| Q    | Decision                                                                                                                                                                                              | Rationale                                                                                  |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1    | Storage via **`node:sqlite`** (built-in), used by CLI + server                                                                                                                                        | Zero deps, no native build, present on Node ≥26                                            |
+| 2    | Single `logentry` JSON column; **expression indices** (`json_extract`) on level/repository/branch, and `err IS NOT NULL`                                                                              | Stays true to single-column spec; QueryBuilder centralizes matching expressions            |
+| 3    | Malformed lines -> synthetic `{"_parseError":true,"_raw":…}` row; blank -> `{"_blank":true}`                                                                                                          | Guarantees rowid == line number; contiguous counts; surfaces corruption                    |
+| 4    | Filter API: root-level keys only in v1 (JSON-path internally); `equals` matches scalars only                                                                                                          | Matches every documented example; simpler; non-breaking to extend later                    |
+| 5    | Config-migration detection: broad, **provisional** case-insensitive patterns in a documented constant                                                                                                 | TBD in spec; no real "needs migration" sample available — must verify later                |
+| 6    | Machine-readable output: v1 schema, category-keyed, zero-counts included, ignored findings emitted with `ignored:true`                                                                                | Stable run-over-run CI comparison                                                          |
+| 7    | Ignore file `renovate-log-parser.ignore.json` (`--ignore-file` override); match by category + optional message-glob + optional repository; optional `expires` (expired => inactive + warn) + `reason` | Line numbers shift; temporary silencing needs stable keys + expiry                         |
+| 8    | Exit codes: `0` clean, `1` non-ignored errors, `2` tool/usage error; `--fail-on-warn` opt-in (no `--max-warnings`)                                                                                    | Distinguishes "analyzer broke" from "log had errors"                                       |
+| 9    | `abandoned-package`: **reserve** category (count always 0), no detection yet                                                                                                                          | Keeps schema/counts forward-compatible without fabricated logic                            |
+| 10   | `level>=50` = build-breaking errors; `level:40` + `repoProblems` (de-duped vs overlapping level:40) + `branchesInformation[].result==="error"` = warnings                                             | Matches Renovate severity; avoids double counting                                          |
+| 11   | `analyze` no-args: **pretty JSON** stats to stdout (`--format=text` deferred)                                                                                                                         | Primary consumer is an AI agent                                                            |
+| 12   | `analyze --print`: **JSONL** to stdout, truncation notices to stderr, `_oL` = 0-indexed line, ordering range -> filter -> limit                                                                       | Mirrors source log; stream-friendly; clean stdout                                          |
+| 13   | `depNames`/`packageNames`: union of root-level keys + `packageFiles with updates` config-object dep arrays, deduped                                                                                   | Fullest dependency picture; cheap (1–2 lines/repo)                                         |
+| 14   | Web server **shares** Parser + QueryBuilder + SQLite cache                                                                                                                                            | One code path; cache reuse; scales                                                         |
+| 15   | Shared code at **`src/core/`**, consumed by CLI natively + Nitro via alias (inlined into `.output`)                                                                                                   | Single source of truth; honors existing 2-part layout                                      |
+| 16   | GET rows: SQL filtering + `offset`/`limit` paging + client virtualization; return `total`                                                                                                             | Only option that scales to large real logs                                                 |
+| 17   | Details: **3/4-width `USlideover`** + recursive collapsible JSON tree (all expanded, `msg` excluded)                                                                                                  | Matches spec; fixed row heights play well with virtualization                              |
+| 18   | One reactive filter object (static dropdowns + `enabled`-toggleable pills); stateless-per-request client state; debounced refetch; **no** URL-sync in v1                                              | Simple, matches spec's static/dynamic split                                                |
+| 19   | Free-text search: field-scoped SQLite `LIKE` (`*` = any run; `?`/character-classes unsupported), **case-insensitive**                                                                                 | Simpler than GLOB; `*`-only wildcard covers the need; case-insensitive per user preference |
+| 20   | Context menus: level/repo actions drive **static dropdowns**; message + JSON-field actions create **pills**; `field==value` item scalar-only                                                          | Prevents pill/dropdown contradictions                                                      |
+| 21   | CLI resolves abs path -> `?log=` handoff; POST-path reads **any** local abs path (unrestricted); file-picker uses temp file + hash                                                                    | Local single-user tool                                                                     |
+| 22   | **Stateful** Nitro server: in-memory registry `md5 -> {path, DatabaseSync}` + current pointer; GET routes always use current log; **no** `md5` override; loading new file replaces current            | Long-lived single-user process; reuse open handles                                         |
+| 23   | Skill: generic **parameterized** `gh` recipe (placeholders), org values in a local git-ignored copy                                                                                                   | Keep published tool org-neutral                                                            |
+| 24   | Cache: `os.tmpdir()/renovate-log-parser-<md5>.db`; transactional parse (crash => 0 rows => rebuild); zero-row orphan cleanup on load; content-md5 key; no TTL/size cap in v1                          | Robust, simple                                                                             |
+| 25   | Tests: `node:test`, **stubs only** — no real log committed (sample is private)                                                                                                                        | User adds committable fixtures later                                                       |
+| 26   | Level glyphs `T/D/I/W/E/F`; **info=green**, warn=amber, error=red, fatal=red-filled, trace/debug=muted; unknown => raw number                                                                         | Per spec + user preference                                                                 |
+| 27   | Both `detect-errors` and `analyze` **require an explicit path**                                                                                                                                       | Predictable; no magic default filename                                                     |
+| 28.1 | `analyze --filter key:val` = scalar equals on root key; `analyze --filter-with-wildcard key:pattern` = case-insensitive `LIKE` where `*` is the only wildcard. Both repeatable, AND'd                 | Shared primitive; wildcard added after Phase 3 per user request                            |
+| 28.2 | `detect-errors` analyzes whole log across all repos; findings carry `repository` when present                                                                                                         | —                                                                                          |
+| 28.3 | Web repo dropdown lists distinct `repository` verbatim (incl. git-URL sub-repos) + "Repository-independent" pseudo-entry                                                                              | —                                                                                          |
+| 28.4 | Analyzer identifies dependency `config` strictly by `msg === "packageFiles with updates"`                                                                                                             | Avoid confusing with `File config` etc.                                                    |
+| 28.5 | Do **not** gitignore the private sample files                                                                                                                                                         | User's choice                                                                              |
+| 28.6 | `node:sqlite` needs **no** experimental flag                                                                                                                                                          | User verified                                                                              |
 
 ---
 
@@ -120,7 +120,6 @@ web/
 ```ts
 type FieldName = string;
 type ScalarValue = string | number | boolean;
-type GlobSearchMode = "key" | "value" | "both" | "keyValue";
 
 interface EqualsFilter {
   type: "equals";
@@ -138,27 +137,33 @@ interface LevelFilter {
   levels: number[];
   negate?: boolean;
 }
-interface GlobFilter {
-  type: "glob";
-  mode: GlobSearchMode;
-  keyPattern?: string;
-  valuePattern?: string;
-  pattern?: string;
+interface LikeFilter {
+  type: "like";
+  field: FieldName;
+  pattern: string; // raw user glob; `*` is the only wildcard
   negate?: boolean;
 }
-type Filter = EqualsFilter | PresenceFilter | LevelFilter | GlobFilter;
+type Filter = EqualsFilter | PresenceFilter | LevelFilter | LikeFilter;
 
 function jsonPath(field): string; // -> $."field"  (escapes embedded ")
 function extractExpr(field, column = "logentry"): string; // -> json_extract(column, '$."field"')
 function parseKeyValueFilter(token): EqualsFilter; // "key:val" (splits on FIRST colon)
+function parseWildcardFilter(token): LikeFilter; // "key:pattern" (splits on FIRST colon)
+function globStarToLike(pattern): string; // escape \ % _, then * -> %
 ```
 
 Semantics: all filters are AND'd. `equals` compares scalars only; **negated** equals is
 null-safe (`expr IS NULL OR expr <> ?`) so entries missing the field are kept when hiding a
 value. `presence` = `IS [NOT] NULL`. `levelIn` empty set => matches nothing (negated =>
-everything); negated is null-safe. `glob` uses `json_tree` + `GLOB` (case-sensitive); value
-matches restricted to leaf scalars via `json_tree.atom` (containers never match). Root-level
-keys only in v1 (paths are built as `$."key"` so nesting is a later non-breaking extension).
+everything); negated is null-safe. `like` is a field-scoped, **case-insensitive** wildcard:
+`globStarToLike` escapes LIKE's `%`/`_`/`\` then maps `*` -> `%`, and QueryBuilder emits
+`CAST(expr AS TEXT) LIKE ? ESCAPE '\'` (null-safe when negated). Root-level keys only in v1
+(paths are built as `$."key"` so nesting is a later non-breaking extension).
+
+> **Note (deviation from original plan):** the original `GlobFilter`
+> (`json_tree` + `GLOB`, 4 modes, case-sensitive) was removed in favour of the
+> simpler field-scoped `LikeFilter` above (Q19/Q28.1). The web free-text search
+> (Phase 5b) will reuse `LikeFilter`.
 
 ### Core: levels (`src/core/levels.ts`) — DELIVERED
 
@@ -353,18 +358,20 @@ AND (repository if present). Expired rules are skipped with a warning to stderr.
 ```
 renovate-log-parser analyze <path>
 renovate-log-parser analyze <path> --print [--ignored-fields <csv>] [--line-from <n>]
-    [--line-to <n>] [--limit <n>] [--filter <key:val> …] [--include-original-line]
+    [--line-to <n>] [--limit <n>] [--filter <key:val> …]
+    [--filter-with-wildcard <key:pattern> …] [--include-original-line]
 ```
 
-| Flag                        | Default                               | Meaning                                            |
-| --------------------------- | ------------------------------------- | -------------------------------------------------- |
-| `<path>`                    | **required**                          | Path to JSONL log                                  |
-| `--print`                   | off                                   | Switch from stats mode to line-printing mode       |
-| `--ignored-fields`          | `v,time,logContext,pid,hostname,name` | CSV of root keys to strip (`msg` never strippable) |
-| `--line-from` / `--line-to` | (none)                                | 0-indexed inclusive rowid range (either optional)  |
-| `--limit`                   | `50`                                  | Max lines to print                                 |
-| `--filter`                  | (none)                                | `key:val` scalar-equals, repeatable, AND'd         |
-| `--include-original-line`   | `false`                               | Add `_oL` = 0-indexed source line to each object   |
+| Flag                        | Default                               | Meaning                                                        |
+| --------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| `<path>`                    | **required**                          | Path to JSONL log                                              |
+| `--print`                   | off                                   | Switch from stats mode to line-printing mode                   |
+| `--ignored-fields`          | `v,time,logContext,pid,hostname,name` | CSV of root keys to strip (`msg` never strippable)             |
+| `--line-from` / `--line-to` | (none)                                | 0-indexed inclusive rowid range (either optional)              |
+| `--limit`                   | `50`                                  | Max lines to print                                             |
+| `--filter`                  | (none)                                | `key:val` scalar-equals, repeatable, AND'd                     |
+| `--filter-with-wildcard`    | (none)                                | `key:pattern` case-insensitive `*`-wildcard, repeatable, AND'd |
+| `--include-original-line`   | `false`                               | Add `_oL` = 0-indexed source line to each object               |
 
 **Stats mode (no `--print`)** — pretty JSON to stdout:
 
@@ -428,8 +435,7 @@ translated server-side into `Filter[]` + `QueryOptions`:
     "independent": true                    // include/exclude the no-`repository` pseudo-group
   },
   "ignoredFields": ["v","time", …],        // -> field stripping on RowDTO (not a WHERE clause)
-  "search": { "mode": "both"|"key"|"value"|"keyValue",
-              "pattern": "*abort*", "keyPattern": "…", "valuePattern": "…" }, // -> GlobFilter
+  "search": { "field": "msg", "pattern": "*abort*" }, // -> LikeFilter (case-insensitive; exact search UX is a Phase 5b detail)
   "pills": [ { "id": "…", "enabled": true,
                "filter": { "type": "equals", "field": "msg", "value": "…", "negate": true } } ]
 }
@@ -451,7 +457,8 @@ response projection, not row matching.
   `enabled` toggle + remove. Row context menu (level/repo actions drive the static dropdowns;
   message actions create pills). JSON-key context menu (show-only/hide `<field>`; show-only/hide
   `<field>==<scalar>` — the value item only for scalar values) creates pills. Free-text search
-  box with the 4 modes. All changes debounce -> refetch `/api/rows`.
+  box (case-insensitive `*`-wildcard `LikeFilter`; exact field-targeting UX TBD). All changes
+  debounce -> refetch `/api/rows`.
 
 ### Skill: `.agents/skills/renovate-log-analyzer/SKILL.md` (Phase 6)
 

@@ -7,7 +7,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseKeyValueFilter, extractExpr } from "../filters.js";
+import {
+  parseKeyValueFilter,
+  parseWildcardFilter,
+  globStarToLike,
+  extractExpr,
+} from "../filters.js";
 import { buildQuery, buildCountQuery } from "../query-builder.js";
 
 test("parseKeyValueFilter splits on the first colon", () => {
@@ -19,6 +24,20 @@ test("parseKeyValueFilter splits on the first colon", () => {
 
 test("parseKeyValueFilter rejects tokens without a colon", () => {
   assert.throws(() => parseKeyValueFilter("nocolon"));
+});
+
+test("parseWildcardFilter builds a like filter, splitting on the first colon", () => {
+  const f = parseWildcardFilter("msg:Found match at*");
+  assert.equal(f.type, "like");
+  assert.equal(f.field, "msg");
+  assert.equal(f.pattern, "Found match at*");
+});
+
+test("globStarToLike maps * to % and escapes LIKE metacharacters", () => {
+  assert.equal(globStarToLike("Found match at*"), "Found match at%");
+  // Literal %, _ and \ are escaped; only * becomes a wildcard.
+  assert.equal(globStarToLike("100%_*"), "100\\%\\_%");
+  assert.equal(globStarToLike("a\\b"), "a\\\\b");
 });
 
 test("extractExpr quotes keys with special characters", () => {
@@ -62,5 +81,22 @@ test("negated equals is null-safe", () => {
   assert.match(sql, /IS NULL OR .* <> \?/);
 });
 
-// TODO(Q25): add QueryBuilder glob-mode cases and level-filter edge cases once
-// fixtures are available.
+test("like filter builds a CAST ... LIKE ? ESCAPE clause", () => {
+  const { sql, params } = buildQuery([
+    { type: "like", field: "msg", pattern: "Found match at*" },
+  ]);
+  assert.match(
+    sql,
+    /CAST\(json_extract\(logentry, '\$\."msg"'\) AS TEXT\) LIKE \? ESCAPE '\\'/,
+  );
+  assert.deepEqual(params, ["Found match at%"]);
+});
+
+test("negated like is null-safe", () => {
+  const { sql } = buildQuery([
+    { type: "like", field: "msg", pattern: "x*", negate: true },
+  ]);
+  assert.match(sql, /IS NULL OR .* NOT LIKE \? ESCAPE '\\'/);
+});
+
+// TODO(Q25): add level-filter edge cases once fixtures are available.

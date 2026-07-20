@@ -26,7 +26,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . && npm run lint --workspace web",
     "start": "node dist/cli.js",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test --test-concurrency=1 \"src/**/*.test.ts\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

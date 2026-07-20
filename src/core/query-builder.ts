@@ -7,13 +7,14 @@
  * indexes, so the query planner can use those expression indices.
  *
  * The builder never interpolates user values into SQL text; every value is a
- * bound parameter. Glob search is delegated to SQLite `json_tree` + `GLOB`
- * (Q19), with value matches restricted to leaf scalars via `json_tree.atom`.
+ * bound parameter. Wildcard (`like`) filters compare a single field with a
+ * case-insensitive SQLite `LIKE ... ESCAPE` (Q28.1); the `*`-to-`%` translation
+ * and escaping happen in {@link globStarToLike}.
  */
 import {
   extractExpr,
+  globStarToLike,
   type Filter,
-  type GlobFilter,
   type ScalarValue,
 } from "./filters.js";
 
@@ -80,59 +81,20 @@ function buildFilter(filter: Filter): { sql: string; params: SqlParam[] } {
         : `${LEVEL_EXPR} IN (${placeholders})`;
       return { sql, params };
     }
-    case "glob":
-      return buildGlobFilter(filter);
-  }
-}
-
-/** Build the `json_tree`-based EXISTS fragment for a glob search. */
-function buildGlobFilter(filter: GlobFilter): {
-  sql: string;
-  params: SqlParam[];
-} {
-  const keyExpr = "jt.key GLOB ?";
-  // Value matches are limited to leaf scalars (atom is NULL for objects/arrays)
-  // and cast to text so numeric/boolean atoms are still comparable via GLOB.
-  const valueExpr = "(jt.atom IS NOT NULL AND CAST(jt.atom AS TEXT) GLOB ?)";
-
-  let condition: string;
-  const params: SqlParam[] = [];
-
-  switch (filter.mode) {
-    case "key":
-      condition = keyExpr;
-      params.push(requirePattern(filter.keyPattern ?? filter.pattern, "key"));
-      break;
-    case "value":
-      condition = valueExpr;
-      params.push(
-        requirePattern(filter.valuePattern ?? filter.pattern, "value"),
-      );
-      break;
-    case "both": {
-      const p = requirePattern(filter.pattern, "both");
-      condition = `(${keyExpr} OR ${valueExpr})`;
-      params.push(p, p);
-      break;
+    case "like": {
+      // Case-insensitive wildcard match on one field. CAST to TEXT so numeric/
+      // boolean fields are still comparable; `\` escapes LIKE metacharacters.
+      const expr = extractExpr(filter.field, COLUMN);
+      const text = `CAST(${expr} AS TEXT)`;
+      const param = globStarToLike(filter.pattern);
+      // Negation is null-safe: entries missing the field are kept when hiding a
+      // pattern (they clearly do not match it).
+      const sql = filter.negate
+        ? `(${expr} IS NULL OR ${text} NOT LIKE ? ESCAPE '\\')`
+        : `${text} LIKE ? ESCAPE '\\'`;
+      return { sql, params: [param] };
     }
-    case "keyValue":
-      condition = `(${keyExpr} AND ${valueExpr})`;
-      params.push(
-        requirePattern(filter.keyPattern, "keyValue.key"),
-        requirePattern(filter.valuePattern, "keyValue.value"),
-      );
-      break;
   }
-
-  const exists = `EXISTS (SELECT 1 FROM json_tree(${TABLE}.${COLUMN}) AS jt WHERE ${condition})`;
-  return { sql: filter.negate ? `NOT ${exists}` : exists, params };
-}
-
-function requirePattern(pattern: string | undefined, which: string): string {
-  if (pattern === undefined || pattern.length === 0) {
-    throw new Error(`Glob search requires a non-empty pattern for "${which}".`);
-  }
-  return pattern;
 }
 
 /**

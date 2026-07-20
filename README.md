@@ -95,17 +95,22 @@ renovate-log-parser analyze renovate.jsonl
 # Print lines 500–560, keeping only npm-manager entries, first 20
 renovate-log-parser analyze renovate.jsonl --print \
   --line-from 500 --line-to 560 --filter manager:npm --limit 20
+
+# Print every entry whose msg starts with "Found match at" (case-insensitive)
+renovate-log-parser analyze renovate.jsonl --print \
+  --filter-with-wildcard "msg:Found match at*"
 ```
 
-| Arg / option                | Default                               | Description                                          |
-| --------------------------- | ------------------------------------- | ---------------------------------------------------- |
-| `<path>`                    | **required**                          | Path to the Renovate JSONL log                       |
-| `--print`                   | `false`                               | Print matching log lines (JSONL) instead of stats    |
-| `--ignored-fields`          | `v,time,logContext,pid,hostname,name` | CSV of root keys to strip in print mode (`msg` kept) |
-| `--line-from` / `--line-to` | (none)                                | Inclusive 0-indexed line range (print mode)          |
-| `--limit`                   | `50`                                  | Max lines to print (print mode)                      |
-| `--filter`                  | (none)                                | `key:val` scalar-equals filter, repeatable, AND'd    |
-| `--include-original-line`   | `false`                               | Add `_oL` (0-indexed source line) to each object     |
+| Arg / option                | Default                               | Description                                                                        |
+| --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
+| `<path>`                    | **required**                          | Path to the Renovate JSONL log                                                     |
+| `--print`                   | `false`                               | Print matching log lines (JSONL) instead of stats                                  |
+| `--ignored-fields`          | `v,time,logContext,pid,hostname,name` | CSV of root keys to strip in print mode (`msg` kept)                               |
+| `--line-from` / `--line-to` | (none)                                | Inclusive 0-indexed line range (print mode)                                        |
+| `--limit`                   | `50`                                  | Max lines to print (print mode)                                                    |
+| `--filter`                  | (none)                                | `key:val` scalar-**equals** filter, repeatable, AND'd                              |
+| `--filter-with-wildcard`    | (none)                                | `key:pattern` wildcard filter (`*` = any run), case-insensitive, repeatable, AND'd |
+| `--include-original-line`   | `false`                               | Add `_oL` (0-indexed source line) to each object                                   |
 
 **Stats mode** reports `levelCounts` (entries per numeric level) and a `repos`
 array — each repository's line span, unique branches, the rowids of its
@@ -118,8 +123,15 @@ by line order). Output is JSONL on stdout with the ignored root fields stripped
 (`msg` is never stripped); when the limit caps the result, a truncation notice is
 written to **stderr** so stdout stays a clean, pipeable stream.
 
+Both filter flags target a single root-level key and can be repeated (all
+conditions are AND'd, alongside any line range). `--filter` matches the value
+**exactly**; `--filter-with-wildcard` treats `*` as "any run of characters"
+(nothing else is special — `?` and `%` are literal) and matches
+case-insensitively. A pattern is anchored as written, so use a leading/trailing
+`*` for prefix/suffix/contains matching (e.g. `msg:*lock file*`).
+
 **Exit codes:** `0` = success · `2` = tool/usage error (bad path, unreadable, bad
-`--filter` token).
+filter token).
 
 ### `web`
 

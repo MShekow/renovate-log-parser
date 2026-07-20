@@ -18,7 +18,7 @@
  * `depName`/`packageName` occurrences (Q13).
  */
 import type { Parser } from "./parser.js";
-import type { EqualsFilter } from "./filters.js";
+import type { Filter } from "./filters.js";
 import { buildQuery, buildCountQuery } from "./query-builder.js";
 
 /** A parsed log entry (Renovate emits many optional fields). */
@@ -71,8 +71,8 @@ export interface PrintOptions {
   lineTo?: number;
   /** Maximum number of lines to emit. */
   limit: number;
-  /** Scalar-equals filters, AND'd (from repeated `--filter key:val`). */
-  filters: readonly EqualsFilter[];
+  /** Scalar-equals / wildcard filters, AND'd (from `--filter` / `--filter-with-wildcard`). */
+  filters: readonly Filter[];
   /** When true, add `_oL` (0-indexed source line) to each emitted object. */
   includeOriginalLine: boolean;
 }

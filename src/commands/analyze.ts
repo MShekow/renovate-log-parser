@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import type { CommandModule } from "yargs";
 import { Parser } from "../core/parser.js";
 import { Analyzer } from "../core/analyzer.js";
-import { parseKeyValueFilter } from "../core/filters.js";
+import { parseKeyValueFilter, parseWildcardFilter } from "../core/filters.js";
 
 /** Default root keys stripped from print-mode output (Q12). `msg` is never stripped. */
 const DEFAULT_IGNORED_FIELDS = "v,time,logContext,pid,hostname,name";
@@ -15,6 +15,7 @@ interface AnalyzeArgs {
   "line-to"?: number;
   limit: number;
   filter?: string[];
+  "filter-with-wildcard"?: string[];
   "include-original-line": boolean;
 }
 
@@ -68,6 +69,13 @@ export const analyzeCommand: CommandModule<object, AnalyzeArgs> = {
         describe:
           "key:val scalar-equals filter, repeatable, AND'd (print mode)",
       })
+      .option("filter-with-wildcard", {
+        type: "string",
+        array: true,
+        describe:
+          "key:pattern wildcard filter (* = any run), case-insensitive, " +
+          "repeatable, AND'd (print mode)",
+      })
       .option("include-original-line", {
         type: "boolean",
         default: false,
@@ -81,7 +89,10 @@ export const analyzeCommand: CommandModule<object, AnalyzeArgs> = {
       const analyzer = new Analyzer(parser);
 
       if (argv.print) {
-        const filters = (argv.filter ?? []).map(parseKeyValueFilter);
+        const filters = [
+          ...(argv.filter ?? []).map(parseKeyValueFilter),
+          ...(argv["filter-with-wildcard"] ?? []).map(parseWildcardFilter),
+        ];
         const result = analyzer.print({
           ignoredFields: splitCsv(argv["ignored-fields"]),
           lineFrom: argv["line-from"],

@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Parser } from "../parser.js";
 import { Analyzer } from "../analyzer.js";
-import { parseKeyValueFilter } from "../filters.js";
+import { parseKeyValueFilter, parseWildcardFilter } from "../filters.js";
 
 function withLog<T>(lines: object[], fn: (analyzer: Analyzer) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "rlp-analyze-"));
@@ -176,4 +176,62 @@ test("print: not truncated when limit covers all matches", () => {
   );
   assert.equal(result.truncated, false);
   assert.equal(result.totalMatched, 1);
+});
+
+test("print: wildcard filter matches a prefix, case-insensitively", () => {
+  const lines = [
+    { level: 20, msg: "Found match at index 1535" },
+    { level: 20, msg: "FOUND MATCH AT INDEX 42" },
+    { level: 20, msg: "no match here" },
+  ];
+  const result = withLog(lines, (a) =>
+    a.print({
+      ignoredFields: [],
+      limit: 50,
+      filters: [parseWildcardFilter("msg:Found match at*")],
+      includeOriginalLine: false,
+    }),
+  );
+  assert.equal(result.totalMatched, 2);
+  assert.deepEqual(
+    result.entries.map((e) => e.msg),
+    ["Found match at index 1535", "FOUND MATCH AT INDEX 42"],
+  );
+});
+
+test("print: literal % in a wildcard pattern is not a wildcard", () => {
+  const lines = [
+    { level: 20, msg: "100% done" },
+    { level: 20, msg: "100 done" },
+  ];
+  const result = withLog(lines, (a) =>
+    a.print({
+      ignoredFields: [],
+      limit: 50,
+      filters: [parseWildcardFilter("msg:100% done")],
+      includeOriginalLine: false,
+    }),
+  );
+  assert.equal(result.totalMatched, 1);
+  assert.equal(result.entries[0].msg, "100% done");
+});
+
+test("print: wildcard and equals filters combine (AND)", () => {
+  const lines = [
+    { level: 20, msg: "Found match at 1", repository: "o/r" },
+    { level: 20, msg: "Found match at 2", repository: "x/y" },
+  ];
+  const result = withLog(lines, (a) =>
+    a.print({
+      ignoredFields: [],
+      limit: 50,
+      filters: [
+        parseKeyValueFilter("repository:o/r"),
+        parseWildcardFilter("msg:Found match*"),
+      ],
+      includeOriginalLine: false,
+    }),
+  );
+  assert.equal(result.totalMatched, 1);
+  assert.equal(result.entries[0].repository, "o/r");
 });
