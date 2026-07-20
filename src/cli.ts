@@ -2,12 +2,14 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { detectErrorsCommand } from "./commands/detect-errors.js";
+import { analyzeCommand } from "./commands/analyze.js";
 import { webCommand } from "./commands/web.js";
 
 await yargs(hideBin(process.argv))
   .scriptName("renovate-log-parser")
   .usage("$0 <command> [options]")
   .command(detectErrorsCommand)
+  .command(analyzeCommand)
   .command(webCommand)
   .demandCommand(1, "You need to specify a command. Try --help.")
   .strict()

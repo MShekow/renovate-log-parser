@@ -13,6 +13,9 @@ npx renovate-log-parser detect-errors path/to/renovate.jsonl
 # Also write a machine-readable JSON report
 npx renovate-log-parser detect-errors path/to/renovate.jsonl --out report.json
 
+# Emit token-efficient stats for an AI coding agent
+npx renovate-log-parser analyze path/to/renovate.jsonl
+
 # Start the Nuxt-based web UI
 npx renovate-log-parser web
 ```
@@ -76,6 +79,47 @@ optional `expires` date are reported to stderr and skipped:
 
 Ignored findings still appear in the report with `"ignored": true`, but are
 excluded from the summary counts and the exit code.
+
+### `analyze <path>`
+
+Emits token-efficient structure for an AI coding agent (or a human). Without
+`--print` it writes pretty-JSON whole-log **stats** to stdout; with `--print` it
+streams a filtered, line-ranged, limited **JSONL** slice of the log (one entry
+per line). The intended loop is: read the stats, pick the interesting line
+range, then `--print` just that range — reading only what you need.
+
+```bash
+# Whole-log stats: level counts + per-repository structure
+renovate-log-parser analyze renovate.jsonl
+
+# Print lines 500–560, keeping only npm-manager entries, first 20
+renovate-log-parser analyze renovate.jsonl --print \
+  --line-from 500 --line-to 560 --filter manager:npm --limit 20
+```
+
+| Arg / option                | Default                               | Description                                          |
+| --------------------------- | ------------------------------------- | ---------------------------------------------------- |
+| `<path>`                    | **required**                          | Path to the Renovate JSONL log                       |
+| `--print`                   | `false`                               | Print matching log lines (JSONL) instead of stats    |
+| `--ignored-fields`          | `v,time,logContext,pid,hostname,name` | CSV of root keys to strip in print mode (`msg` kept) |
+| `--line-from` / `--line-to` | (none)                                | Inclusive 0-indexed line range (print mode)          |
+| `--limit`                   | `50`                                  | Max lines to print (print mode)                      |
+| `--filter`                  | (none)                                | `key:val` scalar-equals filter, repeatable, AND'd    |
+| `--include-original-line`   | `false`                               | Add `_oL` (0-indexed source line) to each object     |
+
+**Stats mode** reports `levelCounts` (entries per numeric level) and a `repos`
+array — each repository's line span, unique branches, the rowids of its
+`branches info extended` and `packageFiles with updates` entries, its
+`repoProblems`, and its dependency inventory (`depNames`/`packageNames`, unioning
+root-level keys with the `packageFiles with updates` config).
+
+**Print mode** selects rows in order line-range -> filters -> `--limit` (first N
+by line order). Output is JSONL on stdout with the ignored root fields stripped
+(`msg` is never stripped); when the limit caps the result, a truncation notice is
+written to **stderr** so stdout stays a clean, pipeable stream.
+
+**Exit codes:** `0` = success · `2` = tool/usage error (bad path, unreadable, bad
+`--filter` token).
 
 ### `web`
 

@@ -385,8 +385,10 @@ renovate-log-parser analyze <path> --print [--ignored-fields <csv>] [--line-from
 }
 ```
 
-Repo grouping keyed by the `repository` value (git-URL repos included verbatim). Entries with
-no `repository` are not a repo (they may still be surfaced elsewhere later). `depNames`/
+Repo grouping keyed by the `repository` value. Entries with no `repository`, and
+git-URL sub-repos whose `repository` is an `https://…` URL (e.g. pre-commit
+hooks), are excluded from the per-repo view (their entries still count toward
+`levelCounts`). `depNames`/
 `packageNames` union root-level keys with the dependency arrays inside the `config` of the
 entry where `msg === "packageFiles with updates"`, deduped.
 
@@ -475,7 +477,7 @@ Implement in dependency order; one phase per session (Phase 5 split in two).
 
 - [x] **Phase 1 — Core**: Parser, QueryBuilder, filters, levels, `node:test` stubs.
 - [x] **Phase 2 — `detect-errors`**: ErrorDetector, categories, ignore file, exit codes, JSON output.
-- [ ] **Phase 3 — `analyze`**: stats + `--print`.
+- [x] **Phase 3 — `analyze`**: stats + `--print`.
 - [ ] **Phase 4 — `web` backend**: stateful registry + 5 routes + CLI `?log=` handoff.
 - [ ] **Phase 5a — `web` frontend (list + details)**: virtualized list, level glyphs, details slideover + JSON tree.
 - [ ] **Phase 5b — `web` frontend (filters + search)**: static dropdowns, pills, context menus, free-text search.
