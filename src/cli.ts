@@ -13,5 +13,13 @@ await yargs(hideBin(process.argv))
   .strict()
   .alias("h", "help")
   .alias("v", "version")
+  .fail((msg, err) => {
+    // Genuine thrown errors propagate; usage/validation failures exit with the
+    // tool/usage exit code (2), per docs/renovate-log-parser-plan.md (Q8).
+    if (err) throw err;
+    console.error(msg);
+    console.error("\nRun with --help for usage.");
+    process.exit(2);
+  })
   .help()
   .parseAsync();

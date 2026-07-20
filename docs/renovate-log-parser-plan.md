@@ -474,7 +474,7 @@ out with committable real-log fixtures later (Q25).
 Implement in dependency order; one phase per session (Phase 5 split in two).
 
 - [x] **Phase 1 — Core**: Parser, QueryBuilder, filters, levels, `node:test` stubs.
-- [ ] **Phase 2 — `detect-errors`**: ErrorDetector, categories, ignore file, exit codes, JSON output.
+- [x] **Phase 2 — `detect-errors`**: ErrorDetector, categories, ignore file, exit codes, JSON output.
 - [ ] **Phase 3 — `analyze`**: stats + `--print`.
 - [ ] **Phase 4 — `web` backend**: stateful registry + 5 routes + CLI `?log=` handoff.
 - [ ] **Phase 5a — `web` frontend (list + details)**: virtualized list, level glyphs, details slideover + JSON tree.

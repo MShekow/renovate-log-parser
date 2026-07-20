@@ -7,11 +7,11 @@ A CLI that parses Renovate Bot debug logs to auto-detect issues in scheduled Ren
 Run directly with `npx` (no install required):
 
 ```bash
-# Basic error detection (currently a stub — prints "hello world")
-npx renovate-log-parser detect-errors
+# Detect build-breaking problems in a Renovate JSONL log (CI-friendly)
+npx renovate-log-parser detect-errors path/to/renovate.jsonl
 
-# Optionally pass a log file (not yet parsed)
-npx renovate-log-parser detect-errors path/to/renovate.log
+# Also write a machine-readable JSON report
+npx renovate-log-parser detect-errors path/to/renovate.jsonl --out report.json
 
 # Start the Nuxt-based web UI
 npx renovate-log-parser web
@@ -26,10 +26,56 @@ renovate-log-parser --help
 
 ## Commands
 
-### `detect-errors [file]`
+### `detect-errors <path>`
 
-Placeholder for the log-parsing feature. Performs basic I/O today; future
-versions will analyse a Renovate debug log and report detected issues.
+Deterministically scans a Renovate debug log (JSONL) for build-breaking
+problems and warnings — designed to gate CI. It prints a human-readable summary
+to stdout and, with `--out`, writes a stable machine-readable JSON report.
+
+```bash
+renovate-log-parser detect-errors renovate.jsonl [--out report.json] \
+  [--ignore-file rules.json] [--fail-on-warn]
+```
+
+| Arg / option     | Default                             | Description                                       |
+| ---------------- | ----------------------------------- | ------------------------------------------------- |
+| `<path>`         | **required**                        | Path to the Renovate JSONL log                    |
+| `--out`          | (none)                              | Also write the machine-readable JSON report here  |
+| `--ignore-file`  | `./renovate-log-parser.ignore.json` | Ignore-rules file (a missing file means no rules) |
+| `--fail-on-warn` | `false`                             | Make warning findings affect the exit code        |
+
+**Exit codes:** `0` = no non-ignored errors · `1` = ≥1 non-ignored error (or, with
+`--fail-on-warn`, ≥1 non-ignored warning) · `2` = tool/usage error (bad path,
+unreadable, bad args, malformed ignore file).
+
+**Detected categories** — errors: `host-error-abort`, `log-error` (level 50),
+`log-fatal` (level 60), `err-object`, `config-migration`; warnings: `warn-log`
+(level 40), `repo-problem`, `branch-error`, plus the reserved `abandoned-package`
+(always 0 for now). The JSON report's `counts` map always lists every category
+(zeros included) for stable run-over-run diffing in CI.
+
+**Ignore file** — silence expected findings with stable keys (line numbers shift
+as logs grow). A finding is ignored iff an active rule matches on `category` AND
+(optional `message` glob) AND (optional exact `repository`). Rules past their
+optional `expires` date are reported to stderr and skipped:
+
+```jsonc
+{
+  "version": 1,
+  "rules": [
+    {
+      "category": "err-object",
+      "message": "*lock file error*", // optional glob (* and ?)
+      "repository": "owner/repo", // optional exact match
+      "reason": "flaky nuget restore, JIRA-123", // optional, for humans
+      "expires": "2026-09-01", // optional ISO date; past => inactive + warn
+    },
+  ],
+}
+```
+
+Ignored findings still appear in the report with `"ignored": true`, but are
+excluded from the summary counts and the exit code.
 
 ### `web`
 
@@ -57,7 +103,7 @@ the Nuxt app lives in [`web/`](./web).
 npm install
 
 # Run the CLI from source (no build step) via tsx
-npm run dev:cli -- detect-errors
+npm run dev:cli -- detect-errors path/to/renovate.jsonl
 npm run dev:cli -- web
 
 # Run the Nuxt app in dev mode (HMR) directly
