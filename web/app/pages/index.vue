@@ -1,67 +1,266 @@
 <script setup lang="ts">
-// Calls the Nitro server route at /api/hello (server/api/hello.ts).
-// This runs on the server during SSR and can be re-run on demand.
-const { data, status, refresh } = await useFetch('/api/hello')
+/**
+ * Main log viewer (Phase 5a): a virtualized, fixed-row-height list of every log
+ * line (level glyph + `msg`) with an on-demand details slide-over. The header
+ * shows the current log path, a file picker (POST /api/log/contents) and a level
+ * breakdown. On mount it reads `?log=` and loads that path (the CLI handoff, plan
+ * Q21). Filters/search arrive in Phase 5b.
+ */
+import { levelMeta } from 'renovate-core/levels'
+import type { RowDTO } from '~/types'
+
+/** Fixed row height in px — must match the rendered row for virtualization. */
+const ROW_HEIGHT = 28
+/** Extra rows rendered above/below the viewport to avoid blank flashes. */
+const OVERSCAN = 10
+
+const route = useRoute()
+const log = useLog()
+const { total, ready, error: rowsError, rows, reload, ensureRange } = useRows()
+
+// --- Virtualization state --------------------------------------------------
+const scroller = ref<HTMLElement | null>(null)
+const scrollTop = ref(0)
+const viewportH = ref(0)
+
+const startIndex = computed(() =>
+  Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN)
+)
+const visibleCount = computed(() =>
+  Math.ceil(viewportH.value / ROW_HEIGHT) + OVERSCAN * 2
+)
+const endIndex = computed(() =>
+  Math.min(total.value, startIndex.value + visibleCount.value)
+)
+
+const visibleRows = computed(() => {
+  const out: { index: number, row: RowDTO | undefined }[] = []
+  for (let i = startIndex.value; i < endIndex.value; i++) {
+    out.push({ index: i, row: rows.value.get(i) })
+  }
+  return out
+})
+
+watch([startIndex, endIndex], () => ensureRange(startIndex.value, endIndex.value))
+
+function onScroll() {
+  scrollTop.value = scroller.value?.scrollTop ?? 0
+}
+
+function measure() {
+  viewportH.value = scroller.value?.clientHeight ?? 0
+}
+
+onMounted(() => {
+  measure()
+  window.addEventListener('resize', measure)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', measure))
+
+// --- Log loading -----------------------------------------------------------
+// When a new log becomes current, reset scroll + reload the row cache.
+watch(
+  () => log.info.value?.md5,
+  async (md5) => {
+    if (!md5) return
+    scrollTop.value = 0
+    scroller.value?.scrollTo({ top: 0 })
+    await reload()
+    await nextTick()
+    measure()
+    ensureRange(startIndex.value, endIndex.value)
+  }
+)
+
+onMounted(async () => {
+  const q = route.query.log
+  const logPath = Array.isArray(q) ? q[0] : q
+  if (typeof logPath === 'string' && logPath.length > 0) {
+    await log.loadFromPath(logPath)
+  }
+})
+
+// --- File picker -----------------------------------------------------------
+const fileInput = ref<HTMLInputElement | null>(null)
+function pickFile() {
+  fileInput.value?.click()
+}
+async function onFileChosen(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const bytes = await file.arrayBuffer()
+  await log.loadFromContents(bytes)
+  input.value = '' // allow re-picking the same file
+}
+
+// --- Details panel ---------------------------------------------------------
+const detailsOpen = ref(false)
+const selectedRow = ref<RowDTO | null>(null)
+function openDetails(row: RowDTO) {
+  selectedRow.value = row
+  detailsOpen.value = true
+}
+
+// --- Header level breakdown ------------------------------------------------
+const levelBreakdown = computed(() => {
+  const counts = log.info.value?.levelCounts ?? {}
+  return Object.entries(counts)
+    .map(([level, count]) => ({ meta: levelMeta(Number(level)), count }))
+    .sort((a, b) => a.meta.level - b.meta.level)
+})
+
+const totalHeight = computed(() => total.value * ROW_HEIGHT)
+const anyError = computed(() => log.error.value ?? rowsError.value)
 </script>
 
 <template>
-  <div>
-    <UPageHero
-      title="renovate-log-parser"
-      description="Demo web UI served by the CLI's `web` command. This page is rendered by Nuxt and fetches live data from the built-in Nitro server."
-      :links="[{
-        label: 'Nuxt UI docs',
-        to: 'https://ui.nuxt.com',
-        target: '_blank',
-        trailingIcon: 'i-lucide-arrow-right',
-        size: 'xl'
-      }]"
-    />
-
-    <UPageSection
-      title="Server functionality"
-      description="The card below is populated from GET /api/hello, a Nitro server route bundled into the app."
-    >
-      <UCard class="max-w-xl mx-auto">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="font-semibold">
-              GET /api/hello
-            </h3>
-            <UBadge
-              :color="status === 'success' ? 'success' : 'neutral'"
-              variant="subtle"
-            >
-              {{ status }}
-            </UBadge>
-          </div>
-        </template>
-
-        <div class="space-y-2">
-          <p class="text-muted text-sm">
-            Message
+  <div class="h-screen flex flex-col">
+    <!-- Header: log path, file picker, level breakdown. -->
+    <header class="shrink-0 border-b border-default px-4 py-2 flex items-center gap-4">
+      <div class="flex items-center gap-2 min-w-0">
+        <UIcon
+          name="i-lucide-file-text"
+          class="size-5 shrink-0 text-primary"
+        />
+        <div class="min-w-0">
+          <p
+            v-if="log.info.value"
+            class="font-mono text-sm truncate"
+            :title="log.info.value.path"
+          >
+            {{ log.info.value.path }}
           </p>
-          <p class="font-medium">
-            {{ data?.message }}
+          <p
+            v-else
+            class="text-sm text-dimmed"
+          >
+            No log loaded
           </p>
-
-          <p class="text-muted text-sm pt-2">
-            Server timestamp
-          </p>
-          <p class="font-mono text-sm">
-            {{ data?.timestamp }}
+          <p
+            v-if="log.info.value"
+            class="text-xs text-dimmed"
+          >
+            {{ log.info.value.totalLines.toLocaleString() }} lines
           </p>
         </div>
+      </div>
 
-        <template #footer>
-          <UButton
-            label="Refresh from server"
-            icon="i-lucide-refresh-cw"
-            :loading="status === 'pending'"
-            @click="refresh()"
+      <!-- Level breakdown pills. -->
+      <div
+        v-if="levelBreakdown.length"
+        class="flex items-center gap-1.5 flex-wrap"
+      >
+        <span
+          v-for="b in levelBreakdown"
+          :key="b.meta.level"
+          class="inline-flex items-center gap-1 text-xs"
+          :title="b.meta.name"
+        >
+          <span :class="[LEVEL_GLYPH_BASE, LEVEL_CLASS[b.meta.color]]">{{ b.meta.symbol }}</span>
+          <span class="tabular-nums text-muted">{{ b.count.toLocaleString() }}</span>
+        </span>
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <UButton
+          icon="i-lucide-folder-open"
+          label="Open file"
+          color="neutral"
+          variant="subtle"
+          size="sm"
+          :loading="log.loading.value"
+          @click="pickFile"
+        />
+        <UColorModeButton />
+        <input
+          ref="fileInput"
+          type="file"
+          class="hidden"
+          accept=".jsonl,.log,.json,.txt,application/json,text/plain"
+          @change="onFileChosen"
+        >
+      </div>
+    </header>
+
+    <!-- Error banner. -->
+    <UAlert
+      v-if="anyError"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      :title="anyError"
+      class="rounded-none"
+    />
+
+    <!-- Body. -->
+    <div
+      ref="scroller"
+      class="flex-1 min-h-0 overflow-auto relative"
+      @scroll="onScroll"
+    >
+      <!-- Empty state. -->
+      <div
+        v-if="!log.info.value && !log.loading.value"
+        class="h-full flex flex-col items-center justify-center gap-3 text-center px-6"
+      >
+        <UIcon
+          name="i-lucide-file-search"
+          class="size-10 text-dimmed"
+        />
+        <p class="text-muted">
+          Open a Renovate JSONL log to begin.
+        </p>
+        <UButton
+          icon="i-lucide-folder-open"
+          label="Open file"
+          color="primary"
+          @click="pickFile"
+        />
+      </div>
+
+      <!-- Loading first page. -->
+      <div
+        v-else-if="log.info.value && !ready"
+        class="h-full flex items-center justify-center"
+      >
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="size-6 animate-spin text-dimmed"
+        />
+      </div>
+
+      <!-- Virtualized list: full-height spacer + absolutely-positioned rows. -->
+      <div
+        v-else-if="log.info.value"
+        class="relative"
+        :style="{ height: `${totalHeight}px` }"
+      >
+        <div
+          v-for="item in visibleRows"
+          :key="item.index"
+          class="absolute inset-x-0"
+          :style="{ top: `${item.index * ROW_HEIGHT}px`, height: `${ROW_HEIGHT}px` }"
+        >
+          <LogRow
+            v-if="item.row"
+            :row="item.row"
+            @open="openDetails(item.row)"
           />
-        </template>
-      </UCard>
-    </UPageSection>
+          <div
+            v-else
+            class="flex items-center gap-2 h-full px-3"
+          >
+            <span class="w-12 shrink-0 text-right font-mono text-xs text-dimmed tabular-nums">{{ item.index }}</span>
+            <USkeleton class="h-3 flex-1" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <DetailsSlideover
+      v-model:open="detailsOpen"
+      :row="selectedRow"
+    />
   </div>
 </template>
