@@ -16,8 +16,8 @@ npx renovate-log-parser detect-errors path/to/renovate.jsonl --out report.json
 # Emit token-efficient stats for an AI coding agent
 npx renovate-log-parser analyze path/to/renovate.jsonl
 
-# Start the Nuxt-based web UI
-npx renovate-log-parser web
+# Explore a log interactively in the Nuxt-based web UI
+npx renovate-log-parser web path/to/renovate.jsonl
 ```
 
 Or install globally:
@@ -140,18 +140,45 @@ filter token).
 ### `web`
 
 Starts the bundled [Nuxt](https://nuxt.com) web UI (with [Nuxt UI](https://ui.nuxt.com)
-and Nuxt's built-in Nitro server). The demo page is server-rendered and fetches
-live data from the `/api/hello` Nitro route.
+and Nuxt's built-in Nitro server) for interactive, filtered log exploration. Pass
+an optional log path to open it automatically; otherwise use the in-app file
+picker. The server keeps the parsed log in memory (SQLite-backed) and streams
+paged rows to the client.
 
-| Option   | Default     | Description                     |
-| -------- | ----------- | ------------------------------- |
-| `--port` | `3000`      | Port to listen on               |
-| `--host` | `localhost` | Host to bind to                 |
-| `--open` | `true`      | Open the web UI in your browser |
+| Arg / option | Default     | Description                                        |
+| ------------ | ----------- | -------------------------------------------------- |
+| `[path]`     | (none)      | Renovate JSONL log to open automatically in the UI |
+| `--port`     | `3000`      | Port to listen on                                  |
+| `--host`     | `localhost` | Host to bind to                                    |
+| `--open`     | `true`      | Open the web UI in your browser                    |
 
 ```bash
+# Open the UI on a specific log
+renovate-log-parser web path/to/renovate.jsonl
+
+# Just start the server (pick a file from inside the UI)
 renovate-log-parser web --port 4000 --no-open
 ```
+
+**The viewer** renders every log line in a virtualized, fixed-height list — a
+colored level glyph (`T/D/I/W/E/F`) plus the entry's `msg`.
+Clicking a row's arrow opens a details slide-over with a recursive,
+collapsible JSON tree of the full entry.
+
+**Filtering** (all AND'd, debounced):
+
+- **Log levels** — a dropdown to show/hide entries by level.
+- **Repositories** — include/exclude by repository, plus a
+  "Repository-independent" pseudo-group for entries with no `repository`.
+- **Ignored fields** — hide noisy root keys from the row list (`msg` is always
+  kept).
+- **Free-text search** — a field selector whose first entry, **Raw search**,
+  matches the whole line (any key or value); any other field does a
+  case-insensitive `*`-wildcard match scoped to that field.
+- **Pills** — dynamic, individually toggleable/removable filters created from row
+  and JSON-tree context menus (e.g. show-only/hide a `field`, or a
+  `field == value`; nested keys create a scoped "contains" search on their
+  top-level ancestor).
 
 ## Development
 
@@ -194,9 +221,12 @@ npm run format:check  # Prettier check (no writes — useful in CI)
 - **CLI** — TypeScript compiled with `tsc` to ESM in `dist/`. Uses
   [`yargs`](https://yargs.js.org) for command parsing. `yargs` is the only
   runtime dependency.
-- **Web** — scaffolded with `npm create nuxt@latest` (Nuxt UI template) and
-  built with `nuxt build`. The command runs the self-contained Nitro server
-  (`web/.output/server/index.mjs`) as a child process.
+- **Web** — a Nuxt UI app built with `nuxt build`. It shares the CLI's parsing
+  and filtering logic from `src/core/` (aliased into the bundle as
+  `renovate-core`), so the browser and the CLI query the same SQLite-backed
+  model. The `web` command runs the self-contained Nitro server
+  (`web/.output/server/index.mjs`) as a child process; when given a log path it
+  hands it off to the UI via a `?log=` query parameter.
 
 ### What gets published
 
