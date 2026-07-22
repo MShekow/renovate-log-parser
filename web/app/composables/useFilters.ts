@@ -138,11 +138,6 @@ function formatScalar(value: ScalarValue): string {
   return typeof value === 'string' ? value : String(value)
 }
 
-/** Truncate a long string for compact labels. */
-function truncate(text: string, max = 40): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
-
 /**
  * Add a pill for `filter` (deduped by signature). If an equivalent pill already
  * exists it is re-enabled rather than duplicated.
@@ -248,13 +243,13 @@ export function useFilters() {
   function showOnlyValue(field: string, value: ScalarValue): void {
     addPill(
       { type: 'equals', field, value },
-      `${field} = ${truncate(formatScalar(value))}`
+      `${field} = ${formatScalar(value)}`
     )
   }
   function hideValue(field: string, value: ScalarValue): void {
     addPill(
       { type: 'equals', field, value, negate: true },
-      `${field} ≠ ${truncate(formatScalar(value))}`
+      `${field} ≠ ${formatScalar(value)}`
     )
   }
   /**

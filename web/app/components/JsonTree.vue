@@ -149,11 +149,6 @@ const scalarValue = computed<ScalarValue | null>(() => {
   return null
 })
 
-/** Truncate long text for compact labels. */
-function truncate(text: string, max = 32): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
-
 /**
  * Compact JSON fragment that must appear inside the root ancestor's serialized
  * value. For an object member it is `"key":value`; for an array element it is
@@ -165,8 +160,8 @@ const fragment = computed<string>(() => {
   return parentIsArray.value ? value : `${JSON.stringify(props.keyName)}:${value}`
 })
 
-/** Friendly, truncated value for pill/menu labels. */
-const labelValue = computed(() => truncate(JSON.stringify(props.value)))
+/** Friendly value for pill/menu labels (full; pills clip visually on hover). */
+const labelValue = computed(() => JSON.stringify(props.value))
 
 const menuItems = computed<ContextMenuItem[][]>(() => {
   if (props.keyName === undefined) return []
