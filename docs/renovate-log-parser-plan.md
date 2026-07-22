@@ -314,8 +314,8 @@ renovate-log-parser detect-errors <path> [--out <file>] [--ignore-file <file>] [
 | `err-object`        | error    | entry has root-level `err` object (`presence` filter on `err`)                                                                                                                        |
 | `config-migration`  | error    | ⚠ `msg` matches (ci) `*config* needs migration*` / `*migration needed*`, OR entry carries a `migratedConfig`/`configMigrationCheck` object. Keep patterns in one documented constant. |
 | `abandoned-package` | warning  | RESERVED — always count 0, no detection yet (Q9)                                                                                                                                      |
-| `warn-log`          | warning  | `level === 40`                                                                                                                                                                        |
-| `repo-problem`      | warning  | each string in a `repoProblems` array, **de-duped** against overlapping `warn-log` messages                                                                                           |
+| `log-warn`          | warning  | `level === 40`                                                                                                                                                                        |
+| `repo-problem`      | warning  | each string in a `repoProblems` array, **de-duped** against overlapping `log-warn` messages                                                                                           |
 | `branch-error`      | warning  | any `branchesInformation[].result === "error"`                                                                                                                                        |
 
 **Machine-readable output schema (v1)** — written to `--out`; the counts map includes **every**
@@ -336,7 +336,7 @@ known category (zeros too) for stable CI diffing:
     "err-object": 2,
     "config-migration": 0,
     "abandoned-package": 0,
-    "warn-log": 6,
+    "log-warn": 6,
     "repo-problem": 0,
     "branch-error": 0,
   },

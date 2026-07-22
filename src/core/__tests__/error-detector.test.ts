@@ -54,7 +54,7 @@ test("level 50/60 and err objects are errors; level 40 is a warning", () => {
   assert.equal(report.counts["log-error"], 1);
   assert.equal(report.counts["log-fatal"], 1);
   assert.equal(report.counts["err-object"], 1);
-  assert.equal(report.counts["warn-log"], 1);
+  assert.equal(report.counts["log-warn"], 1);
   assert.equal(report.summary.errorCount, 3);
   assert.equal(report.summary.warningCount, 1);
   assert.equal(report.exitCode, 1);
@@ -67,7 +67,7 @@ test("host-error-abort matches the exact message", () => {
   assert.equal(report.counts["host-error-abort"], 1);
 });
 
-test("repoProblems are de-duped against overlapping warn-log messages", () => {
+test("repoProblems are de-duped against overlapping log-warn messages", () => {
   const report = detect([
     { level: 40, msg: "⚠️ shared problem" },
     { repoProblems: ["⚠️ shared problem", "unique problem"] },

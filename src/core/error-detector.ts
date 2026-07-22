@@ -8,7 +8,7 @@
  * diff cleanly over time. Categories are independent — an entry that is both a
  * `level:50` error and carries an `err` object yields two findings — with the
  * sole exception of `repo-problem`, which is de-duplicated against overlapping
- * `warn-log` messages.
+ * `log-warn` messages.
  *
  * Detection walks the whole log once (all repositories); findings carry a
  * `repository` when the source entry has one. Line numbers are 0-indexed,
@@ -21,12 +21,12 @@ import { matchIgnoreRule, type IgnoreRule } from "./ignore-file.js";
 /** Ordered list of every known finding category (drives the `counts` map). */
 export const CATEGORIES = [
   "host-error-abort",
+  "log-warn",
   "log-error",
   "log-fatal",
   "err-object",
   "config-migration",
   "abandoned-package",
-  "warn-log",
   "repo-problem",
   "branch-error",
 ] as const;
@@ -40,12 +40,12 @@ export type Severity = "error" | "warning";
 /** Severity for each category. */
 export const SEVERITY: Readonly<Record<Category, Severity>> = {
   "host-error-abort": "error",
+  "log-warn": "warning",
   "log-error": "error",
   "log-fatal": "error",
   "err-object": "error",
   "config-migration": "error",
   "abandoned-package": "warning",
-  "warn-log": "warning",
   "repo-problem": "warning",
   "branch-error": "warning",
 };
@@ -126,7 +126,7 @@ export class ErrorDetector {
       "SELECT line, logentry FROM logs ORDER BY rowid",
     );
 
-    // First pass: collect every warn-log message so repo-problems that merely
+    // First pass: collect every log-warn message so repo-problems that merely
     // echo a level:40 message are not counted twice (Q10).
     const warnLogMessages = new Set<string>();
     for (const { entry } of rows) {
@@ -248,10 +248,10 @@ function collectFindings(
     });
   }
 
-  // warn-log — by level.
-  if (level === WARN_LEVEL) push("warn-log", msg);
+  // log-warn — by level.
+  if (level === WARN_LEVEL) push("log-warn", msg);
 
-  // repo-problem — each string, de-duped against warn-log messages.
+  // repo-problem — each string, de-duped against log-warn messages.
   if (Array.isArray(entry.repoProblems)) {
     for (const problem of entry.repoProblems) {
       if (typeof problem !== "string") continue;

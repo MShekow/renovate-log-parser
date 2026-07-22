@@ -51,9 +51,9 @@ renovate-log-parser detect-errors renovate.jsonl [--out report.json] \
 `--fail-on-warn`, ≥1 non-ignored warning) · `2` = tool/usage error (bad path,
 unreadable, bad args, malformed ignore file).
 
-**Detected categories** — errors: `host-error-abort`, `log-error` (level 50),
-`log-fatal` (level 60), `err-object`, `config-migration`; warnings: `warn-log`
-(level 40), `repo-problem`, `branch-error`, plus the reserved `abandoned-package`
+**Detected categories** — errors: `host-error-abort`, `log-warn`
+(level 40), `log-error` (level 50),
+`log-fatal` (level 60), `err-object`, `config-migration`; `repo-problem`, `branch-error`, plus the reserved `abandoned-package`
 (always 0 for now). The JSON report's `counts` map always lists every category
 (zeros included) for stable run-over-run diffing in CI.
 
