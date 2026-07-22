@@ -32,6 +32,14 @@ interface Props {
 }
 const props = withDefaults(defineProps<Props>(), { depth: 0, path: () => [] })
 
+/**
+ * Root keys backed by dedicated static dropdowns rather than dynamic pills.
+ * Right-clicking their scalar values must update the corresponding dropdown
+ * (Repositories / Levels) instead of creating an equals pill.
+ */
+const REPOSITORY_FIELD = 'repository'
+const LEVEL_FIELD = 'level'
+
 const filters = useFilters()
 
 const expanded = ref(true)
@@ -152,16 +160,32 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
     ]
     const scalar = scalarValue.value
     if (scalar !== null) {
+      // `repository` and `level` have dedicated static dropdowns; route their
+      // equals actions there so they update the dropdown instead of adding a
+      // pill. Fall back to the generic pill helpers for any other field (or an
+      // unexpected value type).
+      let showOnly: () => void
+      let hide: () => void
+      if (field === REPOSITORY_FIELD && typeof scalar === 'string') {
+        showOnly = () => filters.showOnlyRepo(scalar)
+        hide = () => filters.hideRepo(scalar)
+      } else if (field === LEVEL_FIELD && typeof scalar === 'number') {
+        showOnly = () => filters.showOnlyLevel(scalar)
+        hide = () => filters.hideLevel(scalar)
+      } else {
+        showOnly = () => filters.showOnlyValue(field, scalar)
+        hide = () => filters.hideValue(field, scalar)
+      }
       groups.push([
         {
           label: `Show only ${field} = this value`,
           icon: 'i-lucide-equal',
-          onSelect: () => filters.showOnlyValue(field, scalar)
+          onSelect: showOnly
         },
         {
           label: `Hide ${field} = this value`,
           icon: 'i-lucide-equal-not',
-          onSelect: () => filters.hideValue(field, scalar)
+          onSelect: hide
         }
       ])
     }
