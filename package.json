@@ -11,7 +11,7 @@
     "web/.output"
   ],
   "engines": {
-    "node": ">=26"
+    "node": ">=24"
   },
   "workspaces": [
     "web"
