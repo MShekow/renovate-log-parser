@@ -81,6 +81,34 @@ function buildFilter(filter: Filter): { sql: string; params: SqlParam[] } {
         : `${LEVEL_EXPR} IN (${placeholders})`;
       return { sql, params };
     }
+    case "inSet": {
+      const expr = extractExpr(filter.field, COLUMN);
+      if (filter.values.length === 0) {
+        // No values: with includeNull it reduces to a presence check; without,
+        // it matches nothing (or, negated, everything). Kept null-safe.
+        if (filter.includeNull) {
+          const sql = filter.negate ? `${expr} IS NOT NULL` : `${expr} IS NULL`;
+          return { sql, params: [] };
+        }
+        return { sql: filter.negate ? "1=1" : "1=0", params: [] };
+      }
+      const placeholders = filter.values.map(() => "?").join(", ");
+      const params = filter.values.map(scalarParam);
+      let sql: string;
+      if (filter.negate) {
+        // Negation is null-safe. With includeNull the positive match also
+        // covered nulls, so the negation must exclude them; otherwise nulls are
+        // kept (they clearly are not in the value set).
+        sql = filter.includeNull
+          ? `(${expr} IS NOT NULL AND ${expr} NOT IN (${placeholders}))`
+          : `(${expr} IS NULL OR ${expr} NOT IN (${placeholders}))`;
+      } else {
+        sql = filter.includeNull
+          ? `(${expr} IN (${placeholders}) OR ${expr} IS NULL)`
+          : `${expr} IN (${placeholders})`;
+      }
+      return { sql, params };
+    }
     case "like": {
       // Case-insensitive wildcard match on one field. CAST to TEXT so numeric/
       // boolean fields are still comparable; `\` escapes LIKE metacharacters.

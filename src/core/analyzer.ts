@@ -301,7 +301,7 @@ function sortLevelCounts(
 ): Record<string, number> {
   const sorted: Record<string, number> = {};
   for (const key of Object.keys(counts).sort((a, b) => Number(a) - Number(b))) {
-    sorted[key] = counts[key];
+    sorted[key] = counts[key]!;
   }
   return sorted;
 }

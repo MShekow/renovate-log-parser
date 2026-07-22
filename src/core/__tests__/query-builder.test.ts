@@ -120,4 +120,53 @@ test("negated like is null-safe", () => {
   assert.match(sql, /IS NULL OR .* NOT LIKE \? ESCAPE '\\'/);
 });
 
+test("inSet builds an IN clause; includeNull adds an IS NULL branch", () => {
+  const plain = buildQuery([
+    { type: "inSet", field: "repository", values: ["a/b", "c/d"] },
+  ]);
+  assert.match(
+    plain.sql,
+    /json_extract\(logentry, '\$\."repository"'\) IN \(\?, \?\)/,
+  );
+  assert.deepEqual(plain.params, ["a/b", "c/d"]);
+
+  const withNull = buildQuery([
+    { type: "inSet", field: "repository", values: ["a/b"], includeNull: true },
+  ]);
+  assert.match(withNull.sql, /IN \(\?\) OR .* IS NULL/);
+});
+
+test("negated inSet is null-safe unless includeNull excludes nulls", () => {
+  const keepsNulls = buildQuery([
+    { type: "inSet", field: "repository", values: ["a/b"], negate: true },
+  ]);
+  // Exclude mode without the independent group: non-matching repos AND nulls stay.
+  assert.match(keepsNulls.sql, /IS NULL OR .* NOT IN \(\?\)/);
+
+  const dropsNulls = buildQuery([
+    {
+      type: "inSet",
+      field: "repository",
+      values: ["a/b"],
+      includeNull: true,
+      negate: true,
+    },
+  ]);
+  // Exclude mode including the independent group: nulls are excluded too.
+  assert.match(dropsNulls.sql, /IS NOT NULL AND .* NOT IN \(\?\)/);
+});
+
+test("inSet with no values degrades to a presence/no-op check", () => {
+  assert.match(
+    buildQuery([{ type: "inSet", field: "repository", values: [] }]).sql,
+    /WHERE 1=0/,
+  );
+  assert.match(
+    buildQuery([
+      { type: "inSet", field: "repository", values: [], includeNull: true },
+    ]).sql,
+    /IS NULL/,
+  );
+});
+
 // TODO(Q25): add level-filter edge cases once fixtures are available.

@@ -169,6 +169,15 @@ extension).
 > simpler field-scoped `LikeFilter` above (Q19/Q28.1). The web free-text search
 > (Phase 5b) will reuse `LikeFilter`.
 
+> **Note (added in Phase 4):** a fifth filter, `InSetFilter`
+> (`{ type:"inSet", field, values, includeNull?, negate? }`), was added — the
+> arbitrary-field analogue of `LevelFilter`. It gives the OR semantics the AND'd
+> `EqualsFilter`s cannot express, so the web repository include/exclude
+> selection maps to a single filter: include => `inSet(repository, values,
+includeNull=independent)`; exclude => the same, negated. `includeNull` matches
+> the no-`repository` "Repository-independent" group; all null handling is
+> explicit and the negated forms stay null-safe. Non-breaking (new union member).
+
 ### Core: levels (`src/core/levels.ts`) — DELIVERED
 
 ```ts
@@ -427,6 +436,20 @@ capped results) -> **stderr** so stdout stays clean. `_oL` added only when
 `RowDTO = { _oL: number, ...entryWithIgnoredFieldsStripped }` (`msg` never stripped). Errors:
 no current log => `409`; bad path / parse failure => `400`; unreadable => `500`.
 
+> **Note (implementation, Phase 4):** the shared core is exposed to Nitro via the
+> **`renovate-core`** alias (not `#core` — Nuxt strips `#`-prefixed aliases from
+> the generated tsconfig `paths`), set in both `nuxt.config` `alias` and
+> `nitro.alias`; `src/core` is inlined into `web/.output` and `node:sqlite` stays
+> external. The registry + helpers live in auto-imported `web/server/utils/`
+> (`log-registry.ts`, `translate-filters.ts`, `request.ts`). Nuxt 4.4 / Nitro
+> 2.13 ship a mixed h3 v1 (runtime app router) / v2 (auto-imported helpers)
+> setup, so `readBody`/`readRawBody`/`getHeader`/`getQuery` throw at runtime
+> (`event.req.text is not a function`). `request.ts` sidesteps this by reading
+> straight from `event.node.req` (the Node request, present on both event
+> shapes); Phase 5+ server code should use those helpers, not the h3 auto-imports.
+> The upload route reads the **raw** request body (multipart was dropped — the
+> Phase 5 file picker will POST raw bytes).
+
 **`filters` wire format** — the JSON-encoded value of the reactive filter object (Phase 5),
 translated server-side into `Filter[]` + `QueryOptions`:
 
@@ -489,7 +512,7 @@ Implement in dependency order; one phase per session (Phase 5 split in two).
 - [x] **Phase 1 — Core**: Parser, QueryBuilder, filters, levels, `node:test` stubs.
 - [x] **Phase 2 — `detect-errors`**: ErrorDetector, categories, ignore file, exit codes, JSON output.
 - [x] **Phase 3 — `analyze`**: stats + `--print`.
-- [ ] **Phase 4 — `web` backend**: stateful registry + 5 routes + CLI `?log=` handoff.
+- [x] **Phase 4 — `web` backend**: stateful registry + 5 routes + CLI `?log=` handoff.
 - [ ] **Phase 5a — `web` frontend (list + details)**: virtualized list, level glyphs, details slideover + JSON tree.
 - [ ] **Phase 5b — `web` frontend (filters + search)**: static dropdowns, pills, context menus, free-text search.
 - [ ] **Phase 6 — Skill**: `SKILL.md` with parameterized `gh` recipe.

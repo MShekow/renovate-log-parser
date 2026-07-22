@@ -119,8 +119,8 @@ export class Parser {
 
     db.exec("BEGIN");
     try {
-      for (let i = 0; i < lines.length; i++) {
-        insert.run(i, normalizeLine(lines[i]));
+      for (const [i, line] of lines.entries()) {
+        insert.run(i, normalizeLine(line));
       }
       db.exec("COMMIT");
     } catch (err) {

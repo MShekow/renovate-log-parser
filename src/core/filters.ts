@@ -62,8 +62,31 @@ export interface LikeFilter {
   negate?: boolean;
 }
 
+/**
+ * Match log entries whose root-level `field` is one of a set of scalar values.
+ *
+ * This is the generic, arbitrary-field analogue of {@link LevelFilter} and is
+ * primarily used by the web layer to translate a repository include/exclude
+ * selection (potentially many values, which needs OR semantics the AND'd
+ * {@link EqualsFilter}s cannot express) into a single filter. `includeNull`
+ * additionally matches entries where the field is absent (used for the web's
+ * "Repository-independent" pseudo-group). All null handling is explicit so the
+ * negated form stays predictable (see the {@link QueryBuilder} for the emitted
+ * SQL).
+ */
+export interface InSetFilter {
+  type: "inSet";
+  field: FieldName;
+  values: ScalarValue[];
+  /** When true, also match entries where the field is null/absent. */
+  includeNull?: boolean;
+  /** When true, matches entries NOT covered by the (value set + null) match. */
+  negate?: boolean;
+}
+
 /** Any supported filter. All filters in a query are AND'd. */
-export type Filter = EqualsFilter | PresenceFilter | LevelFilter | LikeFilter;
+export type Filter =
+  EqualsFilter | PresenceFilter | LevelFilter | LikeFilter | InSetFilter;
 
 /**
  * Build a SQLite JSON path for a root-level key.

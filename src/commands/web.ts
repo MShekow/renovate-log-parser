@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import type { CommandModule } from "yargs";
 
 interface WebArgs {
+  path?: string;
   port: number;
   host: string;
   open: boolean;
@@ -40,10 +42,14 @@ function openBrowser(url: string): void {
  * `web` — starts the bundled Nuxt (Nitro) production server.
  */
 export const webCommand: CommandModule<object, WebArgs> = {
-  command: "web",
+  command: "web [path]",
   describe: "Start the Nuxt-based web UI",
   builder: (yargs) =>
     yargs
+      .positional("path", {
+        type: "string",
+        describe: "Optional Renovate JSONL log to open automatically in the UI",
+      })
       .option("port", {
         type: "number",
         default: 3000,
@@ -73,8 +79,22 @@ export const webCommand: CommandModule<object, WebArgs> = {
       return;
     }
 
-    const url = `http://${argv.host}:${argv.port}`;
-    console.log(`Starting renovate-log-parser web UI on ${url}`);
+    const baseUrl = `http://${argv.host}:${argv.port}`;
+    // When a log path is given, resolve it to an absolute path and hand it off
+    // to the UI via `?log=` — the frontend reads it on mount and POSTs it to
+    // /api/log/path (plan Q21). The server itself does not need the path.
+    let openUrl = baseUrl;
+    if (argv.path) {
+      const absolutePath = resolve(argv.path);
+      if (!existsSync(absolutePath)) {
+        console.error(`Log file not found: ${absolutePath}`);
+        process.exitCode = 2;
+        return;
+      }
+      openUrl = `${baseUrl}/?log=${encodeURIComponent(absolutePath)}`;
+    }
+
+    console.log(`Starting renovate-log-parser web UI on ${baseUrl}`);
 
     const child = spawn(process.execPath, [serverEntry], {
       stdio: "inherit",
@@ -89,7 +109,7 @@ export const webCommand: CommandModule<object, WebArgs> = {
 
     if (argv.open) {
       // Give Nitro a moment to bind before opening the browser.
-      setTimeout(() => openBrowser(url), 1000);
+      setTimeout(() => openBrowser(openUrl), 1000);
     }
 
     const forward = (signal: NodeJS.Signals) => () => {
