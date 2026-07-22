@@ -16,7 +16,10 @@ const OVERSCAN = 10
 
 const route = useRoute()
 const log = useLog()
-const { total, ready, error: rowsError, rows, reload, ensureRange } = useRows()
+const filters = useFilters()
+const { total, ready, error: rowsError, rows, reload, ensureRange } = useRows(
+  () => filters.serialized.value
+)
 
 // --- Virtualization state --------------------------------------------------
 const scroller = ref<HTMLElement | null>(null)
@@ -55,14 +58,26 @@ onMounted(() => {
   measure()
   window.addEventListener('resize', measure)
 })
-onBeforeUnmount(() => window.removeEventListener('resize', measure))
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measure)
+  clearTimeout(refetchTimer)
+})
 
 // --- Log loading -----------------------------------------------------------
-// When a new log becomes current, reset scroll + reload the row cache.
+// When a new log becomes current, reset filters + scroll and reload the cache.
+// `suppressRefetch` swallows the filter-change refetch that resetting filters
+// would otherwise trigger, so a new log reloads exactly once.
+let suppressRefetch = false
+let refetchTimer: ReturnType<typeof setTimeout> | undefined
+
 watch(
   () => log.info.value?.md5,
   async (md5) => {
     if (!md5) return
+    suppressRefetch = true
+    filters.reset()
+    await nextTick()
+    suppressRefetch = false
     scrollTop.value = 0
     scroller.value?.scrollTo({ top: 0 })
     await reload()
@@ -71,6 +86,19 @@ watch(
     ensureRange(startIndex.value, endIndex.value)
   }
 )
+
+// Debounced refetch whenever the filter model changes (plan Phase 5b).
+watch(filters.serialized, () => {
+  if (suppressRefetch || !log.info.value) return
+  clearTimeout(refetchTimer)
+  refetchTimer = setTimeout(async () => {
+    scrollTop.value = 0
+    scroller.value?.scrollTo({ top: 0 })
+    await reload()
+    await nextTick()
+    ensureRange(startIndex.value, endIndex.value)
+  }, 250)
+})
 
 onMounted(async () => {
   const q = route.query.log
@@ -183,6 +211,9 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
       </div>
     </header>
 
+    <!-- Filter toolbar (Phase 5b): search, static dropdowns, dynamic pills. -->
+    <FilterBar v-if="log.info.value" />
+
     <!-- Error banner. -->
     <UAlert
       v-if="anyError"
@@ -230,6 +261,27 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
         />
       </div>
 
+      <!-- No rows match the current filters. -->
+      <div
+        v-else-if="log.info.value && ready && total === 0"
+        class="h-full flex flex-col items-center justify-center gap-3 text-center px-6"
+      >
+        <UIcon
+          name="i-lucide-filter-x"
+          class="size-10 text-dimmed"
+        />
+        <p class="text-muted">
+          No log lines match the current filters.
+        </p>
+        <UButton
+          icon="i-lucide-filter-x"
+          label="Clear filters"
+          color="neutral"
+          variant="subtle"
+          @click="filters.clearAll()"
+        />
+      </div>
+
       <!-- Virtualized list: full-height spacer + absolutely-positioned rows. -->
       <div
         v-else-if="log.info.value"
@@ -249,9 +301,10 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
           />
           <div
             v-else
-            class="flex items-center gap-2 h-full px-3"
+            class="flex items-center gap-1.5 h-full pl-1.5 pr-3"
           >
-            <span class="w-12 shrink-0 text-right font-mono text-xs text-dimmed tabular-nums">{{ item.index }}</span>
+            <span class="w-3.5 shrink-0" />
+            <span class="w-10 shrink-0 text-right font-mono text-xs text-dimmed tabular-nums">{{ item.index }}</span>
             <USkeleton class="h-3 flex-1" />
           </div>
         </div>

@@ -1,6 +1,7 @@
 /**
- * Shared frontend types for the log viewer (Phase 5a).
+ * Shared frontend types for the log viewer (Phase 5a/5b).
  */
+import type { Filter } from 'renovate-core/filters'
 
 /**
  * A single row as returned by `GET /api/rows`. It is the original log entry with
@@ -34,4 +35,39 @@ export interface RowsResponse {
   offset: number
   limit: number
   rows: RowDTO[]
+}
+
+/**
+ * A dynamic filter "pill" (Phase 5b): a core {@link Filter} wrapped with a
+ * client-side id, a human-readable `label`, and an `enabled` toggle. Disabled
+ * pills stay visible in the UI but are omitted from the query.
+ */
+export interface Pill {
+  id: string
+  enabled: boolean
+  label: string
+  filter: Filter
+}
+
+/** The repository include/exclude selection, part of the filter wire object. */
+export interface RepositoriesWire {
+  mode: 'include' | 'exclude'
+  values: string[]
+  /** Whether the no-`repository` "Repository-independent" group participates. */
+  independent: boolean
+}
+
+/**
+ * The reactive filter object sent (URL-encoded JSON) as the `filters` query
+ * param to `GET /api/rows`. It mirrors the server-side `FilterWire` in
+ * `web/server/utils/translate-filters.ts`. All keys are optional; an absent key
+ * means "no constraint" (an empty object = the unfiltered view). See the plan's
+ * Phase 4 "`filters` wire format" section.
+ */
+export interface FilterWire {
+  levels?: number[]
+  repositories?: RepositoriesWire
+  ignoredFields?: string[]
+  search?: { field: string, pattern: string }
+  pills?: { id: string, enabled: boolean, filter: Filter }[]
 }

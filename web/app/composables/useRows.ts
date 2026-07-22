@@ -7,6 +7,10 @@
  * by their result index (0..total-1), so scrolling back is instant and each page
  * is fetched at most once.
  *
+ * `getFilters` returns the serialized filter wire (see {@link useFilters}); it is
+ * read at fetch time and sent as the `filters` query param. Whenever the filters
+ * change the page calls {@link reload} to drop the (now-stale) cache.
+ *
  * Created once per page instance (not a singleton) so a fresh log gets a clean
  * cache via {@link reload}.
  */
@@ -15,7 +19,7 @@ import type { RowDTO, RowsResponse } from '~/types'
 /** Rows fetched per network request. */
 const PAGE_SIZE = 200
 
-export function useRows() {
+export function useRows(getFilters?: () => string | undefined) {
   const total = ref(0)
   const ready = ref(false)
   const error = ref<string | null>(null)
@@ -31,9 +35,10 @@ export function useRows() {
     inflight.add(page)
     try {
       const offset = page * PAGE_SIZE
-      const res = await $fetch<RowsResponse>('/api/rows', {
-        query: { offset, limit: PAGE_SIZE }
-      })
+      const query: Record<string, string | number> = { offset, limit: PAGE_SIZE }
+      const filters = getFilters?.()
+      if (filters && filters !== '{}') query.filters = filters
+      const res = await $fetch<RowsResponse>('/api/rows', { query })
       total.value = res.total
       const next = new Map(rows.value)
       res.rows.forEach((row, i) => next.set(offset + i, row))

@@ -514,7 +514,7 @@ Implement in dependency order; one phase per session (Phase 5 split in two).
 - [x] **Phase 3 — `analyze`**: stats + `--print`.
 - [x] **Phase 4 — `web` backend**: stateful registry + 5 routes + CLI `?log=` handoff.
 - [x] **Phase 5a — `web` frontend (list + details)**: virtualized list, level glyphs, details slideover + JSON tree.
-- [ ] **Phase 5b — `web` frontend (filters + search)**: static dropdowns, pills, context menus, free-text search.
+- [x] **Phase 5b — `web` frontend (filters + search)**: static dropdowns, pills, context menus, free-text search.
 - [ ] **Phase 6 — Skill**: `SKILL.md` with parameterized `gh` recipe.
 
 ### Follow-up TODOs (revisit with real logs)
