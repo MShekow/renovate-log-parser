@@ -45,6 +45,35 @@ const hasDetails = computed(() =>
   Object.keys(props.row).some(k => !NON_DETAIL_KEYS.has(k))
 )
 
+/**
+ * Keys omitted from the inline preview. This is {@link NON_DETAIL_KEYS} plus
+ * `v` (the pino version marker): the details slide-over still surfaces `v`, but
+ * it is noise in the one-line preview.
+ */
+const PREVIEW_HIDDEN_KEYS = new Set([...NON_DETAIL_KEYS, 'v'])
+
+/** Render a value compactly for the preview: strings as-is, else length-capped JSON. */
+function previewValue(value: unknown): string {
+  const text = typeof value === 'string' ? value : JSON.stringify(value)
+  const max = 60
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+/**
+ * A one-line `key=value | key=value` preview of the entry's extra keys (those
+ * beyond what the row already shows). `repository` is surfaced first when
+ * present; the remaining keys keep their original order.
+ */
+const preview = computed(() => {
+  const keys = Object.keys(props.row).filter(k => !PREVIEW_HIDDEN_KEYS.has(k))
+  keys.sort((a, b) => {
+    if (a === 'repository') return -1
+    if (b === 'repository') return 1
+    return 0
+  })
+  return keys.map(k => `${k}=${previewValue(props.row[k])}`).join(' | ')
+})
+
 /** Text to show: the message, or a muted marker for blank/malformed lines. */
 const isSpecial = computed(() =>
   props.row._blank === true || props.row._parseError === true
@@ -140,10 +169,13 @@ const hasMenu = computed(() => menuItems.value.length > 0)
         {{ row._oL }}
       </span>
       <span :class="[LEVEL_GLYPH_BASE, glyphClass]">{{ glyph }}</span>
-      <span
-        class="truncate flex-1 font-mono text-xs"
-        :class="isSpecial ? 'text-dimmed italic' : ''"
-      >{{ message }}</span>
+      <span class="truncate flex-1 font-mono text-xs">
+        <span :class="isSpecial ? 'text-dimmed italic' : ''">{{ message }}</span>
+        <span
+          v-if="preview"
+          class="text-dimmed ml-2"
+        >{{ preview }}</span>
+      </span>
     </div>
   </UContextMenu>
 </template>
