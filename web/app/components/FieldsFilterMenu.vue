@@ -34,8 +34,8 @@ watch(() => log.info.value?.md5, fetchFields, { immediate: true })
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
-  if (!q) return fields.value
-  return fields.value.filter(f => f.toLowerCase().includes(q))
+  const matches = q ? fields.value.filter(f => f.toLowerCase().includes(q)) : fields.value
+  return sortSelectedFirst(matches, filters.isIgnored)
 })
 
 const hiddenCount = computed(() => filters.ignoredFields.value.length)

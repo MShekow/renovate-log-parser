@@ -33,8 +33,8 @@ watch(() => log.info.value?.md5, fetchRepositories, { immediate: true })
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
-  if (!q) return repositories.value
-  return repositories.value.filter(r => r.toLowerCase().includes(q))
+  const matches = q ? repositories.value.filter(r => r.toLowerCase().includes(q)) : repositories.value
+  return sortSelectedFirst(matches, repo => filters.repoValues.value.includes(repo))
 })
 
 const selectedCount = computed(
