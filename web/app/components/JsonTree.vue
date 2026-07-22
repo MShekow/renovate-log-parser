@@ -18,6 +18,7 @@
  */
 import type { ContextMenuItem } from '@nuxt/ui'
 import type { ScalarValue } from 'renovate-core/filters'
+import { JSON_TREE_BULK_KEY } from '~/composables/useJsonTreeBulk'
 
 interface Props {
   value: unknown
@@ -42,7 +43,36 @@ const LEVEL_FIELD = 'level'
 
 const filters = useFilters()
 
-const expanded = ref(true)
+/**
+ * Bulk collapse/expand pulse provided by `DetailsSlideover`. When its `nonce`
+ * changes we apply the requested `expanded` state to this branch; collapsing a
+ * branch unmounts its children, so the effect cascades to full depth.
+ *
+ * The flat root node (`keyName === undefined`) renders its children with no
+ * header of its own, so it must never collapse — otherwise the root-level keys
+ * would vanish entirely. Bulk actions only reach keyed branches.
+ */
+const bulk = inject(JSON_TREE_BULK_KEY, null)
+
+/**
+ * Initial expanded state. Keyed branches inherit the current bulk target so a
+ * node that (re)mounts after "collapse all" — e.g. when its parent is expanded
+ * by hand — appears collapsed, exposing its immediate children while keeping
+ * their subtrees folded. The flat root is always expanded.
+ */
+const expanded = ref(
+  props.keyName === undefined ? true : bulk ? bulk.value.expanded : true
+)
+
+if (bulk) {
+  watch(
+    () => bulk.value.nonce,
+    () => {
+      if (props.keyName === undefined) return
+      if (isBranch.value && !isEmpty.value) expanded.value = bulk.value.expanded
+    }
+  )
+}
 
 const kind = computed<'array' | 'object' | 'null' | 'primitive'>(() => {
   const v = props.value
