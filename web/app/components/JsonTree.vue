@@ -220,7 +220,7 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
       v-if="keyName !== undefined"
       :items="menuItems"
       :disabled="menuItems.length === 0"
-      :ui="{ content: 'w-72' }"
+      :ui="{ content: 'w-max' }"
     >
       <div
         class="flex items-start gap-1"
