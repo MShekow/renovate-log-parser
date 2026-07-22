@@ -21,6 +21,13 @@ export default tseslint.config(
     },
   },
   {
+    // Build/tooling scripts run under Node (ESM) and use console/process.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     // node:test's `test()` returns a promise that is intentionally not awaited
     // when registered at the top level of a test file.
     files: ["src/**/*.test.ts"],

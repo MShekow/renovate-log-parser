@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npm run build:web && npm run build:cli",
     "build:cli": "tsc -p tsconfig.build.json",
-    "build:web": "npm run build --workspace web",
+    "build:web": "npm run build --workspace web && node scripts/deref-output-symlinks.mjs",
     "dev:cli": "tsx src/cli.ts",
     "dev:web": "npm run dev --workspace web",
     "format": "prettier --write .",
