@@ -191,6 +191,7 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
       </div>
 
       <div class="ml-auto flex items-center gap-2">
+        <FieldsFilterMenu v-if="log.info.value" />
         <UButton
           icon="i-lucide-folder-open"
           label="Open file"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * FilterBar — the Phase 5b filter toolbar. Combines the free-text search box,
- * the three static dropdowns (levels / repositories / hidden fields), the
+ * the two static dropdowns (levels / repositories), the
  * dynamic pills, and a "Clear" affordance. All controls mutate the shared
  * {@link useFilters} singleton; the page watches its serialized value and
  * refetches (debounced).
@@ -85,7 +85,6 @@ const searchPlaceholder = computed(() =>
 
       <LevelFilterMenu />
       <RepositoryFilterMenu />
-      <FieldsFilterMenu />
 
       <UButton
         v-if="hasActive"

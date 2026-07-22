@@ -37,8 +37,6 @@ const filtered = computed(() => {
   const matches = q ? fields.value.filter(f => f.toLowerCase().includes(q)) : fields.value
   return sortSelectedFirst(matches, filters.isIgnored)
 })
-
-const hiddenCount = computed(() => filters.ignoredFields.value.length)
 </script>
 
 <template>
@@ -51,20 +49,16 @@ const hiddenCount = computed(() => filters.ignoredFields.value.length)
       trailing-icon="i-lucide-chevron-down"
     >
       Hidden fields
-      <UBadge
-        v-if="hiddenCount > 0"
-        color="neutral"
-        variant="solid"
-        size="sm"
-      >
-        {{ hiddenCount }}
-      </UBadge>
     </UButton>
 
     <template #content>
       <div class="p-2 w-72 flex flex-col gap-2">
         <p class="text-xs text-muted px-1">
-          Checked fields are stripped from rows &amp; details.
+          Checked fields are stripped from rows &amp; details. This is an
+          advanced setting — you should usually leave it at its default. Only
+          change it if your Renovate logs repurpose one of the default fields
+          (e.g. you set a custom <code>name</code> or <code>hostname</code>) and
+          you need to see it.
         </p>
         <UInput
           v-model="search"
@@ -100,6 +94,16 @@ const hiddenCount = computed(() => filters.ignoredFields.value.length)
             >{{ field }}</span>
           </label>
         </div>
+        <UButton
+          icon="i-lucide-rotate-ccw"
+          label="Reset to defaults"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          block
+          :disabled="filters.isDefaultIgnoredFields.value"
+          @click="filters.resetIgnoredFields()"
+        />
       </div>
     </template>
   </UPopover>

@@ -109,6 +109,17 @@ const wire = computed<FilterWire>(() => {
 /** JSON string of {@link wire}; the value sent as the `filters` query param. */
 const serialized = computed(() => JSON.stringify(wire.value))
 
+/**
+ * Whether the ignored-fields projection currently matches its default envelope
+ * set (order-independent). Drives the "Reset to defaults" affordance in the
+ * Hidden-fields menu.
+ */
+const isDefaultIgnoredFields = computed(
+  () =>
+    ignoredFields.value.length === DEFAULT_IGNORED_FIELDS.length
+    && DEFAULT_IGNORED_FIELDS.every(f => ignoredFields.value.includes(f))
+)
+
 /** Count of active constraints, for a badge on the filter controls. */
 const activeCount = computed(() => {
   let n = 0
@@ -223,6 +234,10 @@ export function useFilters() {
   function isIgnored(field: string): boolean {
     return ignoredFields.value.includes(field)
   }
+  /** Restore the ignored-fields projection to its default envelope set. */
+  function resetIgnoredFields(): void {
+    ignoredFields.value = [...DEFAULT_IGNORED_FIELDS]
+  }
 
   // --- Search --------------------------------------------------------------
   function setSearch(field: string, pattern: string): void {
@@ -293,6 +308,7 @@ export function useFilters() {
   function clearAll(): void {
     levels.value = []
     clearRepos()
+    searchField.value = DEFAULT_SEARCH_FIELD
     searchPattern.value = ''
     pills.value = []
   }
@@ -311,6 +327,7 @@ export function useFilters() {
     wire,
     serialized,
     activeCount,
+    isDefaultIgnoredFields,
     // levels
     toggleLevel,
     showOnlyLevel,
@@ -327,6 +344,7 @@ export function useFilters() {
     // ignored fields
     toggleIgnoredField,
     isIgnored,
+    resetIgnoredFields,
     // search
     setSearch,
     clearSearch,
