@@ -24,7 +24,7 @@ const filters = useFilters()
       :title="pill.enabled ? 'Click to disable' : 'Click to enable'"
       @click="filters.togglePill(pill.id)"
     >
-      <span class="truncate font-mono text-xs">{{ pill.label }}</span>
+      <span class="truncate min-w-0 font-mono text-xs">{{ pill.label }}</span>
       <UIcon
         name="i-lucide-x"
         class="size-3 shrink-0 hover:text-error"

@@ -37,7 +37,7 @@ export interface FilterWire {
   levels?: unknown
   repositories?: RepositoriesSelection
   ignoredFields?: unknown
-  search?: { field?: unknown, pattern?: unknown }
+  search?: { field?: unknown, pattern?: unknown, scope?: unknown }
   pills?: Pill[]
 }
 
@@ -100,11 +100,15 @@ export function translateFilters(wire: FilterWire): TranslatedFilters {
     }
   }
 
-  // Free-text search -> a case-insensitive wildcard (like) filter.
+  // Free-text search. `scope: 'raw'` searches the whole line (a raw filter);
+  // otherwise it is a case-insensitive wildcard (like) filter on one field.
   const search = wire.search
-  if (search && typeof search.field === 'string' && typeof search.pattern === 'string'
-    && search.field.length > 0 && search.pattern.length > 0) {
-    filters.push({ type: 'like', field: search.field, pattern: search.pattern })
+  if (search && typeof search.pattern === 'string' && search.pattern.length > 0) {
+    if (search.scope === 'raw') {
+      filters.push({ type: 'raw', pattern: search.pattern })
+    } else if (typeof search.field === 'string' && search.field.length > 0) {
+      filters.push({ type: 'like', field: search.field, pattern: search.pattern })
+    }
   }
 
   // Pills -> their embedded core filters, only when enabled and well-formed.
@@ -139,6 +143,8 @@ function isFilter(value: unknown): value is Filter {
       return typeof f.field === 'string'
     case 'like':
       return typeof f.field === 'string' && typeof f.pattern === 'string'
+    case 'raw':
+      return typeof f.pattern === 'string'
     case 'levelIn':
       return Array.isArray(f.levels) && f.levels.every(l => typeof l === 'number')
     case 'inSet':

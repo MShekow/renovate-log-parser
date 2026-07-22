@@ -122,6 +122,15 @@ function buildFilter(filter: Filter): { sql: string; params: SqlParam[] } {
         : `${text} LIKE ? ESCAPE '\\'`;
       return { sql, params: [param] };
     }
+    case "raw": {
+      // Case-insensitive wildcard match against the whole line (the `logentry`
+      // JSON text). `logentry` is NOT NULL so no null-safety is needed.
+      const param = globStarToLike(filter.pattern);
+      const sql = filter.negate
+        ? `${COLUMN} NOT LIKE ? ESCAPE '\\'`
+        : `${COLUMN} LIKE ? ESCAPE '\\'`;
+      return { sql, params: [param] };
+    }
   }
 }
 

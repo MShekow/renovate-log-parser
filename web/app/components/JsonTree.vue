@@ -6,10 +6,15 @@
  * children directly with no header line — used for the root object so the panel
  * starts flat.
  *
- * Phase 5b: right-clicking a root-level key (`depth === 1`) opens a context menu
- * to create filter pills — show-only/hide the field's presence, and (for scalar
- * leaves) show-only/hide `field == value`. Filtering only targets root-level
- * keys in v1, so the menu is disabled for nested keys.
+ * Phase 5b (revised): right-clicking a key opens a context menu that creates
+ * filter pills.
+ *   - Root-level keys (`path.length === 1`) get the v1 root-only filters:
+ *     show-only/hide the field's presence, and (for scalar leaves) show-only/hide
+ *     `field == value`.
+ *   - Nested keys (`path.length >= 2`) map to a field-scoped wildcard search on
+ *     the top-level ancestor key (`path[0]`): "the ancestor's serialized value
+ *     contains this compact JSON fragment" (e.g. `"hostType":"github"`). This
+ *     matches the compact JSONL the log actually stores.
  */
 import type { ContextMenuItem } from '@nuxt/ui'
 import type { ScalarValue } from 'renovate-core/filters'
@@ -18,8 +23,14 @@ interface Props {
   value: unknown
   keyName?: string
   depth?: number
+  /**
+   * Full path of segments from the root entry to this node: object keys as
+   * strings, array indices as numbers. The root is `[]`; a root-level key is
+   * `[key]`; nested nodes are longer. Drives the context-menu behaviour.
+   */
+  path?: (string | number)[]
 }
-const props = withDefaults(defineProps<Props>(), { depth: 0 })
+const props = withDefaults(defineProps<Props>(), { depth: 0, path: () => [] })
 
 const filters = useFilters()
 
@@ -43,6 +54,11 @@ const entries = computed<[string, unknown][]>(() => {
 })
 
 const isEmpty = computed(() => isBranch.value && entries.value.length === 0)
+
+/** Path segment for a child key: numeric index for arrays, string key otherwise. */
+function childSegment(k: string): string | number {
+  return kind.value === 'array' ? Number(k) : k
+}
 
 /** Short summary shown for a branch (element/key count + brackets). */
 const summary = computed(() => {
@@ -76,11 +92,17 @@ function toggle() {
   if (isBranch.value && !isEmpty.value) expanded.value = !expanded.value
 }
 
-// --- Context menu (root-level keys only) -----------------------------------
-/** Only root-level keys are addressable by filters in v1 (plan Q4). */
-const canFilter = computed(() => props.depth === 1 && props.keyName !== undefined)
+// --- Context menu ----------------------------------------------------------
+/** Root-level key (direct child of the entry). */
+const isRootLevel = computed(() => props.path.length === 1)
+/** The top-level ancestor key this node lives under (for nested searches). */
+const rootField = computed(() => String(props.path[0] ?? ''))
+/** True when the immediate parent is an array (this node's segment is an index). */
+const parentIsArray = computed(
+  () => typeof props.path[props.path.length - 1] === 'number'
+)
 
-/** Scalar leaf whose value can drive a `field == value` pill. */
+/** Scalar leaf whose value can drive a root-level `field == value` pill. */
 const scalarValue = computed<ScalarValue | null>(() => {
   const v = props.value
   if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
@@ -89,39 +111,81 @@ const scalarValue = computed<ScalarValue | null>(() => {
   return null
 })
 
+/** Truncate long text for compact labels. */
+function truncate(text: string, max = 32): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+/**
+ * Compact JSON fragment that must appear inside the root ancestor's serialized
+ * value. For an object member it is `"key":value`; for an array element it is
+ * the element itself. `JSON.stringify` produces the same compact form SQLite
+ * renders, so the substring matches.
+ */
+const fragment = computed<string>(() => {
+  const value = JSON.stringify(props.value)
+  return parentIsArray.value ? value : `${JSON.stringify(props.keyName)}:${value}`
+})
+
+/** Friendly, truncated value for pill/menu labels. */
+const labelValue = computed(() => truncate(JSON.stringify(props.value)))
+
 const menuItems = computed<ContextMenuItem[][]>(() => {
-  if (!canFilter.value || props.keyName === undefined) return []
+  if (props.keyName === undefined) return []
   const field = props.keyName
-  const groups: ContextMenuItem[][] = [
+
+  // Root-level key: v1 root-only presence + (scalar) equals filters.
+  if (isRootLevel.value) {
+    const groups: ContextMenuItem[][] = [
+      [
+        {
+          label: `Show only entries with "${field}"`,
+          icon: 'i-lucide-eye',
+          onSelect: () => filters.showOnlyField(field)
+        },
+        {
+          label: `Hide entries with "${field}"`,
+          icon: 'i-lucide-eye-off',
+          onSelect: () => filters.hideField(field)
+        }
+      ]
+    ]
+    const scalar = scalarValue.value
+    if (scalar !== null) {
+      groups.push([
+        {
+          label: `Show only ${field} = this value`,
+          icon: 'i-lucide-equal',
+          onSelect: () => filters.showOnlyValue(field, scalar)
+        },
+        {
+          label: `Hide ${field} = this value`,
+          icon: 'i-lucide-equal-not',
+          onSelect: () => filters.hideValue(field, scalar)
+        }
+      ])
+    }
+    return groups
+  }
+
+  // Nested key: search the root ancestor's value for this fragment.
+  const root = rootField.value
+  const frag = fragment.value
+  const label = `${field}: ${labelValue.value}`
+  return [
     [
       {
-        label: `Show only entries with "${field}"`,
+        label: `Show only where "${root}" contains this`,
         icon: 'i-lucide-eye',
-        onSelect: () => filters.showOnlyField(field)
+        onSelect: () => filters.showOnlyContains(root, frag, `${root} ⊃ ${label}`)
       },
       {
-        label: `Hide entries with "${field}"`,
+        label: `Hide where "${root}" contains this`,
         icon: 'i-lucide-eye-off',
-        onSelect: () => filters.hideField(field)
+        onSelect: () => filters.hideContains(root, frag, `${root} ⊅ ${label}`)
       }
     ]
   ]
-  const scalar = scalarValue.value
-  if (scalar !== null) {
-    groups.push([
-      {
-        label: `Show only ${field} = this value`,
-        icon: 'i-lucide-equal',
-        onSelect: () => filters.showOnlyValue(field, scalar)
-      },
-      {
-        label: `Hide ${field} = this value`,
-        icon: 'i-lucide-equal-not',
-        onSelect: () => filters.hideValue(field, scalar)
-      }
-    ])
-  }
-  return groups
 })
 </script>
 
@@ -131,8 +195,8 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
     <UContextMenu
       v-if="keyName !== undefined"
       :items="menuItems"
-      :disabled="!canFilter"
-      :ui="{ content: 'w-64' }"
+      :disabled="menuItems.length === 0"
+      :ui="{ content: 'w-72' }"
     >
       <div
         class="flex items-start gap-1"
@@ -172,6 +236,7 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
         :value="v"
         :key-name="k"
         :depth="depth + 1"
+        :path="[...path, childSegment(k)]"
       />
     </div>
   </div>

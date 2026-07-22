@@ -120,6 +120,20 @@ test("negated like is null-safe", () => {
   assert.match(sql, /IS NULL OR .* NOT LIKE \? ESCAPE '\\'/);
 });
 
+test("raw filter matches the whole logentry column", () => {
+  const { sql, params } = buildQuery([{ type: "raw", pattern: "*abort*" }]);
+  // Whole-line search: LIKE directly on the JSON column, no json_extract.
+  assert.match(sql, /WHERE logentry LIKE \? ESCAPE '\\'/);
+  assert.doesNotMatch(sql, /json_extract/);
+  assert.deepEqual(params, ["%abort%"]);
+});
+
+test("negated raw filter uses NOT LIKE (logentry is never null)", () => {
+  const { sql } = buildQuery([{ type: "raw", pattern: "x", negate: true }]);
+  assert.match(sql, /logentry NOT LIKE \? ESCAPE '\\'/);
+  assert.doesNotMatch(sql, /IS NULL/);
+});
+
 test("inSet builds an IN clause; includeNull adds an IS NULL branch", () => {
   const plain = buildQuery([
     { type: "inSet", field: "repository", values: ["a/b", "c/d"] },

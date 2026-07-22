@@ -37,6 +37,14 @@ const DEFAULT_IGNORED_FIELDS = [
 /** The root key the free-text search targets by default. */
 const DEFAULT_SEARCH_FIELD = 'msg'
 
+/**
+ * Sentinel {@link searchField} value selecting "raw search" — a wildcard match
+ * against the whole serialized log line (any key or any value) rather than one
+ * field. The label doubles as the value; Renovate root keys are camelCase
+ * identifiers, so a spaced/capitalised token cannot collide with a real field.
+ */
+export const RAW_SEARCH = 'Raw search'
+
 // --- Singleton state -------------------------------------------------------
 const levels = ref<number[]>([])
 const repoMode = ref<'include' | 'exclude'>('include')
@@ -79,9 +87,11 @@ const wire = computed<FilterWire>(() => {
 
   const pattern = searchPattern.value.trim()
   if (pattern.length > 0) {
+    const raw = searchField.value === RAW_SEARCH
     w.search = {
-      field: searchField.value || DEFAULT_SEARCH_FIELD,
-      pattern: toContainsPattern(pattern)
+      field: raw ? '' : searchField.value || DEFAULT_SEARCH_FIELD,
+      pattern: toContainsPattern(pattern),
+      scope: raw ? 'raw' : 'field'
     }
   }
 
@@ -247,6 +257,20 @@ export function useFilters() {
       `${field} ≠ ${truncate(formatScalar(value))}`
     )
   }
+  /**
+   * Nested-key search pills (plan Phase 5b, revised). Right-clicking a key
+   * nested below a root key filters on the root ancestor's serialized value
+   * containing the compact JSON `fragment` (e.g. `"hostType":"github"`). This
+   * reuses the field-scoped `like` filter (case-insensitive `*`-wildcard); a
+   * literal `*` inside a value is treated as a wildcard (accepted caveat, e.g.
+   * masked `token` values). The caller supplies the friendly `label`.
+   */
+  function showOnlyContains(field: string, fragment: string, label: string): void {
+    addPill({ type: 'like', field, pattern: `*${fragment}*` }, label)
+  }
+  function hideContains(field: string, fragment: string, label: string): void {
+    addPill({ type: 'like', field, pattern: `*${fragment}*`, negate: true }, label)
+  }
   function togglePill(id: string): void {
     const pill = pills.value.find(p => p.id === id)
     if (!pill) return
@@ -316,6 +340,8 @@ export function useFilters() {
     hideField,
     showOnlyValue,
     hideValue,
+    showOnlyContains,
+    hideContains,
     togglePill,
     removePill,
     clearPills,

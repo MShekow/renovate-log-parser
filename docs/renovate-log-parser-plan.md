@@ -143,7 +143,13 @@ interface LikeFilter {
   pattern: string; // raw user glob; `*` is the only wildcard
   negate?: boolean;
 }
-type Filter = EqualsFilter | PresenceFilter | LevelFilter | LikeFilter;
+interface RawFilter {
+  type: "raw"; // whole-line search: `*` wildcard, case-insensitive
+  pattern: string; // matched against the entire `logentry` JSON text
+  negate?: boolean;
+}
+type Filter =
+  EqualsFilter | PresenceFilter | LevelFilter | LikeFilter | RawFilter;
 
 function jsonPath(field): string; // -> $."field"  (escapes embedded ")
 function extractExpr(field, column = "logentry"): string; // -> json_extract(column, '$."field"')
@@ -168,6 +174,14 @@ extension).
 > (`json_tree` + `GLOB`, 4 modes, case-sensitive) was removed in favour of the
 > simpler field-scoped `LikeFilter` above (Q19/Q28.1). The web free-text search
 > (Phase 5b) will reuse `LikeFilter`.
+
+> **Note (added in Phase 5b fix):** a `RawFilter` (`{ type:"raw", pattern,
+negate? }`) was added for the web "Raw search" mode — the requirement's
+> "find one string in any JSON key or any value". Rather than walk `json_tree`,
+> it does a case-insensitive `*`-wildcard `LIKE` against the **entire** raw
+> `logentry` line (`logentry [NOT] LIKE ? ESCAPE '\'`), so a match anywhere in
+> the serialized JSON (key or value) qualifies. `logentry` is `NOT NULL`, so the
+> negated form needs no null-guard. Non-breaking (new union member).
 
 > **Note (added in Phase 4):** a fifth filter, `InSetFilter`
 > (`{ type:"inSet", field, values, includeNull?, negate? }`), was added — the
@@ -462,7 +476,7 @@ translated server-side into `Filter[]` + `QueryOptions`:
     "independent": true                    // include/exclude the no-`repository` pseudo-group
   },
   "ignoredFields": ["v","time", …],        // -> field stripping on RowDTO (not a WHERE clause)
-  "search": { "field": "msg", "pattern": "*abort*" }, // -> LikeFilter (case-insensitive; exact search UX is a Phase 5b detail)
+  "search": { "field": "msg", "pattern": "*abort*", "scope": "field" }, // scope:"field" -> LikeFilter on the field; scope:"raw" -> RawFilter (whole line, field ignored)
   "pills": [ { "id": "…", "enabled": true,
                "filter": { "type": "equals", "field": "msg", "value": "…", "negate": true } } ]
 }
@@ -481,11 +495,16 @@ response projection, not row matching.
 - **5b**: reactive filter object (`app/composables/useFilters.ts`) per the wire format above.
   Static dropdowns: log levels; repositories (checkboxes + "Repository-independent"); ignored
   fields (checkboxes from `/api/fields`, `msg` not listable). Dynamic **pills** with an
-  `enabled` toggle + remove. Row context menu (level/repo actions drive the static dropdowns;
-  message actions create pills). JSON-key context menu (show-only/hide `<field>`; show-only/hide
-  `<field>==<scalar>` — the value item only for scalar values) creates pills. Free-text search
-  box (case-insensitive `*`-wildcard `LikeFilter`; exact field-targeting UX TBD). All changes
-  debounce -> refetch `/api/rows`.
+  `enabled` toggle + remove (label truncated + `max-w-xs` so stringified objects stay compact).
+  Row context menu (level/repo actions drive the static dropdowns; message actions create pills).
+  JSON-key context menu: **root-level** keys create pills (show-only/hide `<field>`; show-only/hide
+  `<field>==<scalar>` — the value item only for scalar values); **nested** keys create a
+  field-scoped search pill on the top-level ancestor key whose pattern is the compact JSON
+  fragment (`*"<key>":<JSON.stringify(value)>*`, or `*<JSON.stringify(value)>*` for array
+  elements) — i.e. "the ancestor's serialized value contains this". Free-text search box: a
+  field selector whose first entry, **"Raw search"**, matches the whole line (`RawFilter`, any key
+  or value); any other selection is a field-scoped case-insensitive `*`-wildcard `LikeFilter`.
+  All changes debounce -> refetch `/api/rows`.
 
 ### Skill: `.agents/skills/renovate-log-analyzer/SKILL.md` (Phase 6)
 

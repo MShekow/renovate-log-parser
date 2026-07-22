@@ -63,6 +63,23 @@ export interface LikeFilter {
 }
 
 /**
+ * Case-insensitive wildcard match against the **entire raw log line** (the
+ * whole `logentry` JSON text), where `*` (and only `*`) is a wildcard. This is
+ * the "raw search" the web UI exposes: the user's term is looked for anywhere in
+ * the serialized line — in any key or any value — without targeting a field.
+ * Translated to a SQLite `LIKE ... ESCAPE` on the `logentry` column by the
+ * {@link QueryBuilder}; `*`-to-`%` translation/escaping happens in
+ * {@link globStarToLike}.
+ */
+export interface RawFilter {
+  type: "raw";
+  /** Raw user pattern where `*` matches any run of characters. */
+  pattern: string;
+  /** When true, matches entries whose line does NOT match the pattern. */
+  negate?: boolean;
+}
+
+/**
  * Match log entries whose root-level `field` is one of a set of scalar values.
  *
  * This is the generic, arbitrary-field analogue of {@link LevelFilter} and is
@@ -86,7 +103,12 @@ export interface InSetFilter {
 
 /** Any supported filter. All filters in a query are AND'd. */
 export type Filter =
-  EqualsFilter | PresenceFilter | LevelFilter | LikeFilter | InSetFilter;
+  | EqualsFilter
+  | PresenceFilter
+  | LevelFilter
+  | LikeFilter
+  | RawFilter
+  | InSetFilter;
 
 /**
  * Build a SQLite JSON path for a root-level key.

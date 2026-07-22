@@ -10,25 +10,35 @@ const filters = useFilters()
 const log = useLog()
 const { searchPattern, searchField } = filters
 
-/** Fields available as the search target (msg first, then log root keys). */
-const searchFields = ref<string[]>(['msg'])
+/**
+ * Fields available as the search target: "Raw search" (whole line, any key or
+ * value) first, then `msg`, then the log's other root keys.
+ */
+const searchFields = ref<string[]>([RAW_SEARCH, 'msg'])
 
 async function fetchSearchFields(): Promise<void> {
   if (!log.info.value) {
-    searchFields.value = ['msg']
+    searchFields.value = [RAW_SEARCH, 'msg']
     return
   }
   try {
     const all = await $fetch<string[]>('/api/fields')
-    searchFields.value = ['msg', ...all.filter(f => f !== 'msg')]
+    searchFields.value = [RAW_SEARCH, 'msg', ...all.filter(f => f !== 'msg')]
   } catch {
-    searchFields.value = ['msg']
+    searchFields.value = [RAW_SEARCH, 'msg']
   }
 }
 
 watch(() => log.info.value?.md5, fetchSearchFields, { immediate: true })
 
 const hasActive = computed(() => filters.activeCount.value > 0)
+
+/** Placeholder reflecting the selected search target. */
+const searchPlaceholder = computed(() =>
+  searchField.value === RAW_SEARCH
+    ? 'Search entire line (use * for wildcards)…'
+    : `Search ${searchField.value} (use * for wildcards)…`
+)
 </script>
 
 <template>
@@ -54,7 +64,7 @@ const hasActive = computed(() => filters.activeCount.value > 0)
           v-model="searchPattern"
           icon="i-lucide-search"
           class="w-64"
-          :placeholder="`Search ${searchField} (use * for wildcards)…`"
+          :placeholder="searchPlaceholder"
           :ui="{ trailing: 'pe-1' }"
         >
           <template

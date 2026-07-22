@@ -68,6 +68,6 @@ export interface FilterWire {
   levels?: number[]
   repositories?: RepositoriesWire
   ignoredFields?: string[]
-  search?: { field: string, pattern: string }
+  search?: { field: string, pattern: string, scope?: 'field' | 'raw' }
   pills?: { id: string, enabled: boolean, filter: Filter }[]
 }
