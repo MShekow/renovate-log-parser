@@ -22,6 +22,27 @@ test("parseKeyValueFilter splits on the first colon", () => {
   assert.equal(f.value, "foo/bar:baz");
 });
 
+test("parseKeyValueFilter coerces numeric and boolean values", () => {
+  // Numeric root fields (level/pid/v) are stored as numbers; SQLite won't
+  // equate 30 with '30', so the CLI value must be typed.
+  assert.equal(parseKeyValueFilter("level:30").value, 30);
+  assert.equal(parseKeyValueFilter("x:-3").value, -3);
+  assert.equal(parseKeyValueFilter("x:1.5").value, 1.5);
+  assert.equal(parseKeyValueFilter("x:0").value, 0);
+  assert.equal(parseKeyValueFilter("flag:true").value, true);
+  assert.equal(parseKeyValueFilter("flag:false").value, false);
+});
+
+test("parseKeyValueFilter keeps identifiers and version-like values as strings", () => {
+  assert.equal(
+    parseKeyValueFilter("repository:owner/repo").value,
+    "owner/repo",
+  );
+  assert.equal(parseKeyValueFilter("x:007").value, "007"); // leading zero
+  assert.equal(parseKeyValueFilter("x:1.2.3").value, "1.2.3"); // dotted version
+  assert.equal(parseKeyValueFilter("x:True").value, "True"); // not lowercase bool
+});
+
 test("parseKeyValueFilter rejects tokens without a colon", () => {
   assert.throws(() => parseKeyValueFilter("nocolon"));
 });

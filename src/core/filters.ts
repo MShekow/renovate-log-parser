@@ -85,7 +85,7 @@ export function extractExpr(field: FieldName, column = "logentry"): string {
 /** Parse a `key:val` CLI filter token into an {@link EqualsFilter}. */
 export function parseKeyValueFilter(token: string): EqualsFilter {
   const { field, value } = splitKeyValue(token);
-  return { type: "equals", field, value };
+  return { type: "equals", field, value: coerceScalar(value) };
 }
 
 /**
@@ -124,4 +124,26 @@ function splitKeyValue(token: string): { field: string; value: string } {
  */
 export function globStarToLike(pattern: string): string {
   return pattern.replace(/[\\%_]/g, "\\$&").replace(/\*/g, "%");
+}
+
+/** Strict numeric literal: an integer or simple decimal, no leading zeros. */
+const NUMERIC_LITERAL = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+
+/**
+ * Coerce a raw CLI string value to its scalar type so `equals` filters compare
+ * against the correctly-typed JSON value.
+ *
+ * Renovate stores many root fields as numbers (`level`, `pid`, `v`) or booleans,
+ * and SQLite never treats a numeric value as equal to a text value — so without
+ * this, `--filter level:30` would compare `30 = '30'` and never match.
+ *
+ * Coercion is deliberately conservative: only `true`/`false` and strict numeric
+ * literals are converted. Leading-zero (`007`) and dotted/version-like (`1.2.3`)
+ * values stay strings, since those are meaningful string identifiers.
+ */
+export function coerceScalar(value: string): ScalarValue {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (NUMERIC_LITERAL.test(value)) return Number(value);
+  return value;
 }

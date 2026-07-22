@@ -125,10 +125,14 @@ written to **stderr** so stdout stays a clean, pipeable stream.
 
 Both filter flags target a single root-level key and can be repeated (all
 conditions are AND'd, alongside any line range). `--filter` matches the value
-**exactly**; `--filter-with-wildcard` treats `*` as "any run of characters"
-(nothing else is special — `?` and `%` are literal) and matches
-case-insensitively. A pattern is anchored as written, so use a leading/trailing
-`*` for prefix/suffix/contains matching (e.g. `msg:*lock file*`).
+**exactly**; its value is auto-typed so it compares against the correctly-typed
+JSON — `true`/`false` become booleans and plain numbers become numbers (so
+`level:30` matches the numeric `level`), while everything else (including
+leading-zero or dotted values like `007` / `1.2.3`) stays a string.
+`--filter-with-wildcard` treats `*` as "any run of characters" (nothing else is
+special — `?` and `%` are literal) and matches case-insensitively. A pattern is
+anchored as written, so use a leading/trailing `*` for prefix/suffix/contains
+matching (e.g. `msg:*lock file*`).
 
 **Exit codes:** `0` = success · `2` = tool/usage error (bad path, unreadable, bad
 filter token).

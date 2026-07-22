@@ -235,3 +235,24 @@ test("print: wildcard and equals filters combine (AND)", () => {
   assert.equal(result.totalMatched, 1);
   assert.equal(result.entries[0].repository, "o/r");
 });
+
+test("print: equals filter on a numeric field matches after coercion", () => {
+  const lines = [
+    { level: 30, msg: "info a" },
+    { level: 20, msg: "debug" },
+    { level: 30, msg: "info b" },
+  ];
+  const result = withLog(lines, (a) =>
+    a.print({
+      ignoredFields: [],
+      limit: 50,
+      filters: [parseKeyValueFilter("level:30")],
+      includeOriginalLine: false,
+    }),
+  );
+  assert.equal(result.totalMatched, 2);
+  assert.deepEqual(
+    result.entries.map((e) => e.msg),
+    ["info a", "info b"],
+  );
+});
