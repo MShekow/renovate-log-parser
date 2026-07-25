@@ -1,0 +1,14 @@
+services:
+  renovate:
+    image: renovate/renovate:latest
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    environment:
+      RENOVATE_TOKEN: ${GITHUB_PAT}
+      GITHUB_COM_TOKEN: ${GITHUB_PAT}
+      RENOVATE_CONFIG_FILE: "/config.js"
+      LOG_LEVEL: "debug" # use "debug" to get a lot more log output for diagnostic purposes
+      LOG_FILE: "/logs/out.log"
+    volumes:
+      - ./renovate-config.js:/config.js
+      - ./container-out-logs:/logs
+    restart: no

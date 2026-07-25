@@ -6,7 +6,13 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "web/**", "node_modules/**", ".nuxt/**"],
+    ignores: [
+      "dist/**",
+      "web/**",
+      "node_modules/**",
+      ".nuxt/**",
+      "renovate-config.js",
+    ],
   },
   eslint.configs.recommended,
   {
