@@ -1,14 +1,68 @@
 services:
+  certificate-generator:
+    image: alpine/openssl:3.5.7
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 3650 \
+          -keyout /certificates/firewall.key \
+          -out /certificates/firewall.crt \
+          -subj "/CN=blocked.invalid" \
+          -addext "subjectAltName=DNS:blocked.invalid"
+        chmod 644 /certificates/firewall.crt
+        chmod 600 /certificates/firewall.key
+    volumes:
+      - firewall-certificates:/certificates
+    restart: no
+
+  firewall:
+    image: nginx:1.31.3-alpine
+    depends_on:
+      certificate-generator:
+        condition: service_completed_successfully
+    volumes:
+      - ./container-firewall/nginx.conf:/etc/nginx/nginx.conf:ro
+      - firewall-certificates:/etc/nginx/certificates:ro
+    networks:
+      default:
+        aliases:
+          # Add every blocked hostname here so Docker DNS directs it to NGINX.
+          # Do "docker compose down" after you changed the values, for it to have an effect
+          - npmjs.org
+          - www.npmjs.org
+          - registry.npmjs.org
+          - builds.dotnet.microsoft.com
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+    restart: no
+
   renovate:
     image: renovate/renovate:latest
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    # The wrapper starts as root only so it can restore host ownership afterward.
+    # Renovate itself runs as the image's standard ubuntu user.
+    user: root
+    entrypoint: ["/renovate-entrypoint.sh"]
+    pull_policy: always
+    depends_on:
+      firewall:
+        condition: service_healthy
     environment:
       RENOVATE_TOKEN: ${GITHUB_PAT}
       GITHUB_COM_TOKEN: ${GITHUB_PAT}
       RENOVATE_CONFIG_FILE: "/config.js"
       LOG_LEVEL: "debug" # use "debug" to get a lot more log output for diagnostic purposes
       LOG_FILE: "/logs/out.log"
+      HOST_UID: "${LOCAL_UID:-1000}"
+      HOST_GID: "${LOCAL_GID:-1000}"
     volumes:
       - ./renovate-config.js:/config.js
+      - ./container-firewall/renovate-entrypoint.sh:/renovate-entrypoint.sh:ro
       - ./container-out-logs:/logs
     restart: no
+
+volumes:
+  firewall-certificates:
