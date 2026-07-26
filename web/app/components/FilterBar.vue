@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * FilterBar — the Phase 5b filter toolbar. Combines the free-text search box,
+ * FilterBar — the filter toolbar. Combines the free-text search box,
  * the two static dropdowns (levels / repositories), the
  * dynamic pills, and a "Clear" affordance. All controls mutate the shared
  * {@link useFilters} singleton; the page watches its serialized value and

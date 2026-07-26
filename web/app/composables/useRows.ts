@@ -1,8 +1,8 @@
 /**
- * `useRows` — paged row cache that backs the virtualized list (plan Q16).
+ * `useRows` — paged row cache that backs the virtualized list.
  *
  * `GET /api/rows` returns rows for a `offset`/`limit` window plus the `total`
- * count matching the (Phase 5b) filters. The client virtualizes: it renders only
+ * count matching the active filters. The client virtualizes: it renders only
  * the visible slice and fetches the pages covering it on demand. Rows are cached
  * by their result index (0..total-1), so scrolling back is instant and each page
  * is fetched at most once.

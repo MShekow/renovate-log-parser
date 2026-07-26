@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * DetailsSlideover — a 3/4-width slide-over showing the full JSON of a log entry
- * as a collapsible tree (plan Q17 / Phase 5a). `msg` is shown in the header and
+ * as a collapsible tree. `msg` is shown in the header and
  * excluded from the tree; `_oL` (the synthetic source-line marker) is surfaced as
  * the title and likewise omitted from the tree body.
  */

@@ -1,7 +1,6 @@
 /**
  * Analyzer — produces the two token-efficient views the `analyze` command
- * exposes to an AI coding agent (see docs/renovate-log-parser-plan.md,
- * Q11–Q13, Q28.1/Q28.4):
+ * exposes to an AI coding agent:
  *
  *  - {@link Analyzer.stats} — a single pass over the whole log summarising level
  *    counts and per-repository structure (line spans, branches, dependency
@@ -14,8 +13,8 @@
  * without one, and git-URL sub-repos whose `repository` is an `https://…` URL
  * (e.g. pre-commit hooks), are excluded from the per-repo view. The dependency
  * inventory is disambiguated strictly by
- * `msg === "packageFiles with updates"` (Q28.4), unioned with root-level
- * `depName`/`packageName` occurrences (Q13).
+ * `msg === "packageFiles with updates"`, unioned with root-level
+ * `depName`/`packageName` occurrences.
  */
 import type { Parser } from "./parser.js";
 import type { Filter } from "./filters.js";

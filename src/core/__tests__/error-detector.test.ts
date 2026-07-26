@@ -1,11 +1,10 @@
 /**
  * ErrorDetector / ignore-file tests.
  *
- * STUB: Phase 2 scaffolding. These build tiny synthetic JSONL logs in a temp
- * dir (no committed real log — the sample is private, see
- * docs/renovate-log-parser-plan.md, Q25) and assert the core detection
+ * These tests build tiny synthetic JSONL logs in a temp
+ * dir and assert the core detection
  * contracts: category mapping, counts completeness, repo-problem de-dup,
- * ignore-rule matching, and exit codes. Flesh out with real fixtures later.
+ * ignore-rule matching, and exit codes.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

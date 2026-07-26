@@ -1,5 +1,5 @@
 /**
- * Stateful, process-wide log registry for the web backend (plan Q14/Q22).
+ * Stateful, process-wide log registry for the web backend.
  *
  * The `web` command runs a single long-lived Nitro process for one user, so we
  * keep every loaded log's open {@link Parser} (and its SQLite handle) in memory

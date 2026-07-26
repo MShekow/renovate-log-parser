@@ -1,6 +1,6 @@
 /**
- * GET /api/rows — the paginated, filtered row feed for the current log
- * (plan Phase 4 / Q16). Query params:
+ * GET /api/rows — the paginated, filtered row feed for the current log.
+ * Query params:
  *   - `filters` : URL-encoded JSON of the reactive filter object (optional)
  *   - `offset`  : rows to skip (default 0)
  *   - `limit`   : max rows to return (default 100)

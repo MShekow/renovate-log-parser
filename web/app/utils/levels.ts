@@ -1,7 +1,7 @@
 /**
  * Maps the semantic {@link LevelColor} tokens from the shared core onto concrete
  * Nuxt UI / Tailwind classes for the log-level glyph. Keeping the mapping in a
- * single place (plan Phase 5a note on `LEVEL_CLASS`) means the CLI and web layers
+ * single place (the `LEVEL_CLASS` map below) means the CLI and web layers
  * agree on level semantics while the visual treatment lives here.
  */
 import type { LevelColor } from 'renovate-core/levels'

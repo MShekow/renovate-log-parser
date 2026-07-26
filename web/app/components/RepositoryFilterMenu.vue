@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * RepositoryFilterMenu — the static "repositories" dropdown (Phase 5b, plan
- * Q28.3). Lists the distinct `repository` values in the current log (verbatim,
+ * RepositoryFilterMenu — the static "repositories" dropdown.
+ * Lists the distinct `repository` values in the current log (verbatim,
  * incl. git-URL sub-repos) as checkboxes, plus an include/exclude mode switch
  * and a "Repository-independent" pseudo-entry for entries with no `repository`.
  * Maps to a single `inSet` filter server-side.

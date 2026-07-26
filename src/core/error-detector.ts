@@ -3,9 +3,8 @@
  * (non-breaking) warnings, producing the stable machine-readable report used by
  * the `detect-errors` command and CI.
  *
- * The category model is fixed (see docs/renovate-log-parser-plan.md, Q6/Q9/Q10):
- * every known category is always present in `counts` (zeros included) so runs
- * diff cleanly over time. Categories are independent — an entry that is both a
+ * The category model is fixed: every known category is always present in
+ * `counts` (zeros included) so runs diff cleanly over time. Categories are independent — an entry that is both a
  * `level:50` error and carries an `err` object yields two findings — with the
  * sole exception of `repo-problem`, which is de-duplicated against overlapping
  * `log-warn` messages.
@@ -123,7 +122,7 @@ export class ErrorDetector {
     );
 
     // First pass: collect every log-warn message so repo-problems that merely
-    // echo a level:40 message are not counted twice (Q10).
+    // echo a level:40 message are not counted twice.
     const warnLogMessages = new Set<string>();
     for (const { entry } of rows) {
       if (entry.level === WARN_LEVEL && typeof entry.msg === "string") {

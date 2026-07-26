@@ -1,14 +1,12 @@
 /**
- * Shared frontend types for the log viewer (Phase 5a/5b).
+ * Shared frontend types for the log viewer.
  */
 import type { Filter } from 'renovate-core/filters'
 
 /**
  * A single row as returned by `GET /api/rows`. It is the original log entry with
  * the server-added `_oL` (0-indexed source line) plus whatever root keys survive
- * the ignored-fields projection. `msg` is never stripped. In Phase 5a no fields
- * are stripped, so `level`/`msg`/etc. are all present when the source entry has
- * them.
+ * the ignored-fields projection. `msg` is never stripped.
  */
 export interface RowDTO {
   /** 0-indexed source line number in the original log file. */
@@ -38,7 +36,7 @@ export interface RowsResponse {
 }
 
 /**
- * A dynamic filter "pill" (Phase 5b): a core {@link Filter} wrapped with a
+ * A dynamic filter "pill": a core {@link Filter} wrapped with a
  * client-side id, a human-readable `label`, and an `enabled` toggle. Disabled
  * pills stay visible in the UI but are omitted from the query.
  */
@@ -61,8 +59,7 @@ export interface RepositoriesWire {
  * The reactive filter object sent (URL-encoded JSON) as the `filters` query
  * param to `GET /api/rows`. It mirrors the server-side `FilterWire` in
  * `web/server/utils/translate-filters.ts`. All keys are optional; an absent key
- * means "no constraint" (an empty object = the unfiltered view). See the plan's
- * Phase 4 "`filters` wire format" section.
+ * means "no constraint" (an empty object = the unfiltered view).
  */
 export interface FilterWire {
   levels?: number[]

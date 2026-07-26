@@ -1,9 +1,5 @@
 /**
  * Filter model / QueryBuilder tests.
- *
- * STUB: These are scaffolding for Phase 1. Assertions cover the parts that need
- * no log fixture (pure SQL generation). Fill in richer cases once committable
- * real-world log fixtures exist (see docs/renovate-log-parser-plan.md, Q25).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

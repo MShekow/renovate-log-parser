@@ -1,6 +1,6 @@
 /**
  * GET /api/repositories — the distinct `repository` values across the current
- * log (plan Q28.3), excluding git-URL sub-repos (e.g. pre-commit hooks) whose
+ * log, excluding git-URL sub-repos (e.g. pre-commit hooks) whose
  * `repository` is an `https://…` URL rather than an `owner/repo` slug — these
  * aren't real repos and just clutter the dropdown (mirrors the exclusion in
  * `analyzer.ts`'s per-repo stats). The UI adds a "Repository-independent"

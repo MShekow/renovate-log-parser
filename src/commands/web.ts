@@ -82,7 +82,7 @@ export const webCommand: CommandModule<object, WebArgs> = {
     const baseUrl = `http://${argv.host}:${argv.port}`;
     // When a log path is given, resolve it to an absolute path and hand it off
     // to the UI via `?log=` — the frontend reads it on mount and POSTs it to
-    // /api/log/path (plan Q21). The server itself does not need the path.
+    // /api/log/path. The server itself does not need the path.
     let openUrl = baseUrl;
     if (argv.path) {
       const absolutePath = resolve(argv.path);

@@ -6,7 +6,7 @@
  * the {@link QueryBuilder} translates into parameterized SQL. Filters are always
  * AND'd together.
  *
- * Design decisions (see docs/renovate-log-parser-plan.md, Q4/Q19/Q28.1):
+ * Design decisions:
  *  - Only root-level JSON keys are addressable in v1 (`$.<key>`), though the
  *    helpers below already build JSON paths so nested support is a non-breaking
  *    extension later.

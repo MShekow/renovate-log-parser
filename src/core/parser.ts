@@ -2,7 +2,7 @@
  * Parser — loads a Renovate JSONL log into a cached SQLite database and answers
  * SQL queries against it.
  *
- * Behaviour (see docs/renovate-log-parser-plan.md, Q1–Q3, Q24):
+ * Behaviour:
  *  - The cache key is the md5 of the file *content*, stored at
  *    `<os.tmpdir()>/renovate-log-parser-<md5>.db`. Identical logs at different
  *    paths share a cache; a changed file re-parses.

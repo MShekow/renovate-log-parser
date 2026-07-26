@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * FieldsFilterMenu — the static "ignored fields" dropdown (Phase 5b). Lists the
+ * FieldsFilterMenu — the static "ignored fields" dropdown. Lists the
  * distinct root-level keys in the current log (from `GET /api/fields`) as
  * checkboxes; a checked field is stripped from every row (and the details
- * panel). `msg` is never listable/strippable (plan). This shapes the response
+ * panel). `msg` is never listable/strippable. This shapes the response
  * projection, not row matching.
  */
 const filters = useFilters()

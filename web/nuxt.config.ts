@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 // The shared core (Parser, QueryBuilder, filter model, …) lives at
 // ../src/core and is consumed natively by the CLI (tsc). Here it is exposed to
 // the Nitro server via the `renovate-core` alias so it gets inlined into web/.output at
-// build time — one source of truth, no duplicate copy shipped (plan Q14/Q15).
+// build time — one source of truth, no duplicate copy shipped.
 const coreDir = fileURLToPath(new URL('../src/core', import.meta.url))
 
 export default defineNuxtConfig({

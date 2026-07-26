@@ -1,6 +1,6 @@
 /**
  * GET /api/fields — the distinct set of root-level JSON keys across the current
- * log (plan Phase 4). Powers the "ignored fields" checkboxes in the UI. The
+ * log. Powers the "ignored fields" checkboxes in the UI. The
  * synthetic keys the Parser uses for blank / malformed lines are excluded.
  */
 export default defineEventHandler(() => {

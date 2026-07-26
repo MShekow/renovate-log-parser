@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * JsonTree — a recursive, collapsible view of an arbitrary JSON value (Phase 5a
+ * JsonTree — a recursive, collapsible view of an arbitrary JSON value (the
  * details panel). Branches (objects/arrays) render a chevron toggle and are
- * expanded by default (plan Q17). When `keyName` is omitted the node renders its
+ * expanded by default. When `keyName` is omitted the node renders its
  * children directly with no header line — used for the root object so the panel
  * starts flat.
  *
- * Phase 5b (revised): right-clicking a key opens a context menu that creates
+ * Right-clicking a key opens a context menu that creates
  * filter pills.
  *   - Root-level keys (`path.length === 1`) get the v1 root-only filters:
  *     show-only/hide the field's presence, and (for scalar leaves) show-only/hide

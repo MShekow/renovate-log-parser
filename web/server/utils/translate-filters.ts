@@ -1,6 +1,6 @@
 /**
- * Translate the web UI's reactive filter object (the `filters` wire format, see
- * plan Phase 4 / Phase 5b) into the shared {@link Filter} model plus
+ * Translate the web UI's reactive filter object (the `filters` wire format) into
+ * the shared {@link Filter} model plus
  * {@link QueryOptions} that the {@link QueryBuilder} understands.
  *
  * Wire shape (all keys optional):

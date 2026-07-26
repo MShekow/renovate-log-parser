@@ -1,11 +1,9 @@
 /**
  * Parser tests.
  *
- * STUB: Phase 1 scaffolding. These build a tiny synthetic JSONL file in a temp
- * dir (no committed real log — the sample is private, see
- * docs/renovate-log-parser-plan.md, Q25) and assert the core guarantees:
+ * These tests build a tiny synthetic JSONL file in a temp
+ * dir and assert the core guarantees:
  * rowid == line number, malformed/blank line handling, and cache reuse.
- * Extend with real fixtures later.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

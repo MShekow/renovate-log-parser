@@ -1,13 +1,11 @@
 /**
  * Analyzer tests.
  *
- * STUB: Phase 3 scaffolding. These build tiny synthetic JSONL logs in a temp
- * dir (no committed real log — the sample is private, see
- * docs/renovate-log-parser-plan.md, Q25) and assert the core `analyze`
+ * These tests build tiny synthetic JSONL logs in a temp
+ * dir and assert the core `analyze`
  * contracts: level counts, per-repo line spans, dependency-inventory unioning
  * (root keys + `packageFiles with updates` config), and print-mode
- * range/filter/limit selection, field stripping, and truncation. Flesh out with
- * real fixtures later.
+ * range/filter/limit selection, field stripping, and truncation.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

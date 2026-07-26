@@ -1,10 +1,10 @@
 /**
  * POST /api/log/path — load a log from an absolute local path and make it the
- * current log (plan Phase 4). Body: `{ "path": "<absolute>" }`. Blocks until the
+ * current log. Body: `{ "path": "<absolute>" }`. Blocks until the
  * log is parsed (or a valid cache is reused). Returns the load metadata.
  *
  * This reads any local absolute path unrestricted — the tool is a local,
- * single-user utility (plan Q21).
+ * single-user utility.
  */
 export default defineEventHandler(async (event) => {
   const body = await readJsonBody<{ path?: unknown }>(event)

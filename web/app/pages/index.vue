@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * Main log viewer (Phase 5a): a virtualized, fixed-row-height list of every log
+ * Main log viewer: a virtualized, fixed-row-height list of every log
  * line (level glyph + `msg`) with an on-demand details slide-over. The header
  * shows the current log path, a file picker (POST /api/log/contents) and a level
- * breakdown. On mount it reads `?log=` and loads that path (the CLI handoff, plan
- * Q21). Filters/search arrive in Phase 5b.
+ * breakdown. On mount it reads `?log=` and loads that path (the CLI handoff).
  */
 import { levelMeta } from 'renovate-core/levels'
 import type { RowDTO } from '~/types'
@@ -87,7 +86,7 @@ watch(
   }
 )
 
-// Debounced refetch whenever the filter model changes (plan Phase 5b).
+// Debounced refetch whenever the filter model changes.
 watch(filters.serialized, () => {
   if (suppressRefetch || !log.info.value) return
   clearTimeout(refetchTimer)
@@ -212,7 +211,7 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
       </div>
     </header>
 
-    <!-- Filter toolbar (Phase 5b): search, static dropdowns, dynamic pills. -->
+    <!-- Filter toolbar: search, static dropdowns, dynamic pills. -->
     <FilterBar v-if="log.info.value" />
 
     <!-- Error banner. -->

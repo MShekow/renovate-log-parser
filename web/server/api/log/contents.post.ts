@@ -1,7 +1,7 @@
 /**
  * POST /api/log/contents — load a log from uploaded bytes (file picker). The
  * bytes are written to a temp file named by their md5, which becomes the log's
- * `path` (plan Phase 4 / Q21). The file contents are sent as the raw request
+ * `path`. The file contents are sent as the raw request
  * body.
  */
 export default defineEventHandler(async (event) => {

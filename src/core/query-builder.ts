@@ -2,13 +2,13 @@
  * QueryBuilder — translates the shared {@link Filter} model into a single
  * parameterized SQL SELECT against the parser's `logs` table.
  *
- * All filters are AND'd (see docs/renovate-log-parser-plan.md, Q4). WHERE
+ * All filters are AND'd. WHERE
  * fragments reuse the exact `json_extract(...)` expressions that the parser
  * indexes, so the query planner can use those expression indices.
  *
  * The builder never interpolates user values into SQL text; every value is a
  * bound parameter. Wildcard (`like`) filters compare a single field with a
- * case-insensitive SQLite `LIKE ... ESCAPE` (Q28.1); the `*`-to-`%` translation
+ * case-insensitive SQLite `LIKE ... ESCAPE`; the `*`-to-`%` translation
  * and escaping happen in {@link globStarToLike}.
  */
 import {

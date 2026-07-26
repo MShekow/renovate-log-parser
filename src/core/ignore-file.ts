@@ -8,8 +8,7 @@
  * category AND (message glob, if present) AND (repository, if present).
  *
  * Expired rules (past `expires`) are inactive and reported to stderr on load, so
- * a temporary silence surfaces again once its window closes (see
- * docs/renovate-log-parser-plan.md, Q7).
+ * a temporary silence surfaces again once its window closes.
  */
 import { existsSync, readFileSync } from "node:fs";
 

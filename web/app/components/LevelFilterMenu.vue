@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * LevelFilterMenu — the static "log levels" dropdown (Phase 5b). Shows a
+ * LevelFilterMenu — the static "log levels" dropdown. Shows a
  * checkbox per level that occurs in the current log (with its count); an empty
  * selection means "all levels". Mutates {@link useFilters}'s `levels` (a
  * `levelIn` filter server-side).

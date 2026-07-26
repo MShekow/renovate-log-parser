@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
- * LogRow — a single fixed-height line in the virtualized log list (Phase 5a):
+ * LogRow — a single fixed-height line in the virtualized log list:
  * source line number, level glyph, and the `msg`. When the entry has keys beyond
- * `msg` a chevron affordance appears and the whole row opens the details panel
- * (plan Phase 5a).
+ * `msg` a chevron affordance appears and the whole row opens the details panel.
  *
- * Right-clicking opens a context menu (Phase 5b): level/repository actions drive
+ * Right-clicking opens a context menu: level/repository actions drive
  * the static dropdowns (via {@link useFilters}); message actions create pills.
  */
 import { levelMeta } from 'renovate-core/levels'

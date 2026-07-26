@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * FilterPills — the row of dynamic filter pills (Phase 5b). Each pill wraps a
+ * FilterPills — the row of dynamic filter pills. Each pill wraps a
  * core filter created by a context-menu action (message / JSON-field) and is
  * rendered by {@link FilterPill}: clicking toggles its `enabled` state (disabled
  * pills stay visible but drop out of the query); the ✕ removes it entirely.

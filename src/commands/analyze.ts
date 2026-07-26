@@ -4,7 +4,7 @@ import { Parser } from "../core/parser.js";
 import { Analyzer } from "../core/analyzer.js";
 import { parseKeyValueFilter, parseWildcardFilter } from "../core/filters.js";
 
-/** Default root keys stripped from print-mode output (Q12). `msg` is never stripped. */
+/** Default root keys stripped from print-mode output. `msg` is never stripped. */
 const DEFAULT_IGNORED_FIELDS = "v,time,logContext,pid,hostname,name";
 
 interface AnalyzeArgs {
@@ -25,7 +25,7 @@ interface AnalyzeArgs {
  * Without `--print` it prints pretty-JSON whole-log stats (level counts +
  * per-repository structure). With `--print` it streams a filtered, line-ranged,
  * limited JSONL slice to stdout (truncation notices go to stderr so stdout stays
- * clean). See docs/renovate-log-parser-plan.md, Phase 3.
+ * clean).
  *
  * Exit codes: 0 = success; 2 = tool/usage error (bad path, unreadable, bad args).
  */

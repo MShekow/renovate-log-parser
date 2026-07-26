@@ -3,8 +3,8 @@
  * color. Shared by the web UI (row glyphs) and any CLI text rendering.
  *
  * Colors are expressed as semantic tokens (not raw hex) so the web layer can
- * map them onto Nuxt UI / Tailwind classes. See docs/renovate-log-parser-plan.md
- * (Q26): info = green, warn = amber, error = red, fatal = red (filled),
+ * map them onto Nuxt UI / Tailwind classes: info = green, warn = amber,
+ * error = red, fatal = red (filled),
  * trace/debug = muted; unknown levels render their raw number.
  */
 
@@ -34,7 +34,7 @@ export const LEVELS: Readonly<Record<number, LevelMeta>> = {
   60: { level: 60, name: "fatal", symbol: "F", color: "red-filled" },
 };
 
-/** Levels considered build-breaking errors by `detect-errors` (Q10). */
+/** Levels considered build-breaking errors by `detect-errors`. */
 export const ERROR_LEVELS: readonly number[] = [50, 60];
 
 /** The warn level surfaced as a (non-breaking) warning by `detect-errors`. */

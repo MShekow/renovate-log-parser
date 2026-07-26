@@ -1,11 +1,11 @@
 /**
  * `useFilters` — the single reactive filter model that drives the log viewer's
- * row query (Phase 5b). It is a module-level singleton (like {@link useLog}) so
+ * row query. It is a module-level singleton (like {@link useLog}) so
  * the filter bar, the row list, and the context menus all read and mutate the
  * same state.
  *
- * The state maps 1:1 onto the server's `filters` wire format (see the plan's
- * Phase 4 section and `web/server/utils/translate-filters.ts`):
+ * The state maps 1:1 onto the server's `filters` wire format (see
+ * `web/server/utils/translate-filters.ts`):
  *   - {@link levels}          -> `levelIn`   (empty = all levels)
  *   - {@link repoMode}/{@link repoValues}/{@link repoIndependent} -> `inSet` on `repository`
  *   - {@link ignoredFields}   -> response projection (which root keys to strip)
@@ -13,7 +13,7 @@
  *   - {@link pills}           -> arbitrary core {@link Filter}s with an enable toggle
  *
  * {@link serialized} is the JSON string actually sent as the query param; the
- * page watches it (debounced) to refetch. The plan splits filter controls into
+ * page watches it (debounced) to refetch. Filter controls are split into
  * "static dropdowns" (levels/repositories/ignored-fields, mutated by the
  * dedicated menus and by row-context "level/repo" actions) and "dynamic pills"
  * (created by message- and JSON-field context menus).
@@ -23,7 +23,7 @@ import type { FilterWire, Pill } from '~/types'
 
 /**
  * Root keys stripped from rows by default — the noisy Renovate envelope fields
- * (matches the `analyze` command's default `--ignored-fields`, plan Phase 3).
+ * (matches the `analyze` command's default `--ignored-fields`).
  */
 const DEFAULT_IGNORED_FIELDS = [
   'v',
@@ -268,7 +268,7 @@ export function useFilters() {
     )
   }
   /**
-   * Nested-key search pills (plan Phase 5b, revised). Right-clicking a key
+   * Nested-key search pills. Right-clicking a key
    * nested below a root key filters on the root ancestor's serialized value
    * containing the compact JSON `fragment` (e.g. `"hostType":"github"`). This
    * reuses the field-scoped `like` filter (case-insensitive `*`-wildcard); a
