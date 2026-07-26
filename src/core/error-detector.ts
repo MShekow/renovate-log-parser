@@ -21,6 +21,8 @@
 import { ERROR_LEVELS, WARN_LEVEL } from "./levels.js";
 import type { Parser } from "./parser.js";
 import { matchIgnoreRule, type IgnoreRule } from "./ignore-file.js";
+import { buildQuery } from "./query-builder.js";
+import type { Filter } from "./filters.js";
 
 /** Ordered list of every known finding category (drives the `counts` map). */
 export const CATEGORIES = [
@@ -117,9 +119,45 @@ export class ErrorDetector {
       throw new Error("No log loaded. Call parser.load() before detection.");
     }
 
-    const rows = this.parser.queryEntries<LogEntry>(
-      "SELECT line, logentry FROM logs ORDER BY rowid",
-    );
+    // Fetch only rows that can yield a finding, instead of scanning
+    // the ENTIRE log (hogging memory). QueryBuilder AND's filters, so the disjunction
+    // of finding predicates is expressed as separate queries, merged by line.
+    const filterGroups: Filter[][] = [
+      [{ type: "levelIn", levels: [WARN_LEVEL, ...ERROR_LEVELS] }],
+      [{ type: "presence", field: "err" }],
+      [{ type: "presence", field: "repoProblems" }],
+      [
+        {
+          type: "inSet",
+          field: "msg",
+          values: [
+            REPOSITORY_FINISHED_MSG,
+            CONFIG_MIGRATION_MSG,
+            ABANDONED_PACKAGE_MSG,
+          ],
+        },
+      ],
+    ];
+
+    // A row can match more than one group (e.g. a level:50 entry that also
+    // carries an `err`), so dedupe by line before walking.
+    const byLine = new Map<number, LogEntry>();
+    for (const filters of filterGroups) {
+      const { sql, params } = buildQuery(
+        filters,
+        { order: "asc" },
+        "line, logentry",
+      );
+      for (const { line, entry } of this.parser.queryEntries<LogEntry>(
+        sql,
+        params,
+      )) {
+        byLine.set(line, entry);
+      }
+    }
+    const rows = [...byLine.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([line, entry]) => ({ line, entry }));
 
     // First pass: collect every log-warn message so repo-problems that merely
     // echo a level:40 message are not counted twice.
