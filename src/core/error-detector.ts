@@ -13,6 +13,11 @@
  * Detection walks the whole log once (all repositories); findings carry a
  * `repository` when the source entry has one. Line numbers are 0-indexed,
  * matching the parser's rowid == source-line invariant.
+ *
+ * The error/warning split is scoped to problems Renovate would *not* otherwise
+ * surface in a PR comment: `host-error-abort`, `log-error`, `log-fatal`,
+ * `config-migration`, and `abandoned-package` are errors (exit 1); `log-warn`,
+ * `err-object`, and `repo-problem` are warnings.
  */
 import { ERROR_LEVELS, WARN_LEVEL } from "./levels.js";
 import type { Parser } from "./parser.js";
@@ -28,7 +33,6 @@ export const CATEGORIES = [
   "config-migration",
   "abandoned-package",
   "repo-problem",
-  "branch-error",
 ] as const;
 
 /** A finding category. */
@@ -43,31 +47,23 @@ export const SEVERITY: Readonly<Record<Category, Severity>> = {
   "log-warn": "warning",
   "log-error": "error",
   "log-fatal": "error",
-  "err-object": "error",
+  "err-object": "warning",
   "config-migration": "error",
-  "abandoned-package": "warning",
+  "abandoned-package": "error",
   "repo-problem": "warning",
-  "branch-error": "warning",
 };
 
-/**
- * ⚠ Provisional config-migration detection patterns (Q5). No real
- * "needs migration" sample is available yet; these case-insensitive `msg`
- * patterns and the config-object keys below must be verified against a real log.
- */
-export const CONFIG_MIGRATION_MSG_PATTERNS: readonly RegExp[] = [
-  /config.*needs migration/i,
-  /migration needed/i,
-];
+/** The `msg` that marks a per-repository run summary. */
+const REPOSITORY_FINISHED_MSG = "Repository finished";
 
-/** ⚠ Provisional: presence of any of these root keys signals a migration. */
-export const CONFIG_MIGRATION_KEYS: readonly string[] = [
-  "migratedConfig",
-  "configMigrationCheck",
-];
+/** The `result` on a "Repository finished" entry that signals an aborting host error. */
+const HOST_ERROR_RESULT = "external-host-error";
 
-/** The exact `msg` that marks an aborting external-host error. */
-const HOST_ERROR_ABORT_MSG = "External host error causing abort";
+/** The exact `msg` that marks a required config migration. */
+const CONFIG_MIGRATION_MSG = "Config migration necessary";
+
+/** The exact `msg` that carries abandoned-package statistics. */
+const ABANDONED_PACKAGE_MSG = "Abandoned package statistics";
 
 /** A single detected problem. */
 export interface Finding {
@@ -213,9 +209,9 @@ function collectFindings(
     });
   };
 
-  // host-error-abort — exact message match.
-  if (msg === HOST_ERROR_ABORT_MSG) {
-    push("host-error-abort", msg, errDetails(entry));
+  // host-error-abort — a "Repository finished" summary aborted by a host error.
+  if (msg === REPOSITORY_FINISHED_MSG && entry.result === HOST_ERROR_RESULT) {
+    push("host-error-abort", msg, { result: entry.result });
   }
 
   // log-error / log-fatal — by level.
@@ -234,18 +230,32 @@ function collectFindings(
     push("err-object", errMessage, { err });
   }
 
-  // config-migration — provisional message/key heuristics (⚠ Q5).
-  const migrationKey = CONFIG_MIGRATION_KEYS.find(
-    (key) => entry[key] !== undefined,
-  );
-  const migrationPattern = CONFIG_MIGRATION_MSG_PATTERNS.find((re) =>
-    re.test(msg),
-  );
-  if (migrationKey !== undefined || migrationPattern !== undefined) {
-    push("config-migration", msg, {
-      matchedKey: migrationKey,
-      matchedPattern: migrationPattern?.source,
-    });
+  // config-migration — exact message plus the old/new config pair.
+  if (
+    msg === CONFIG_MIGRATION_MSG &&
+    entry.oldConfig !== undefined &&
+    entry.newConfig !== undefined
+  ) {
+    push("config-migration", msg, { keys: ["oldConfig", "newConfig"] });
+  }
+
+  // abandoned-package — one finding per package, keyed as `datasource:package`.
+  // The entry carries datasource-named objects (e.g. `npm`, `crate`) mapping a
+  // package name to its last-update timestamp; string/number metadata fields are
+  // skipped by only descending into plain-object root values.
+  if (msg === ABANDONED_PACKAGE_MSG) {
+    for (const [datasource, group] of Object.entries(entry)) {
+      if (group === null || typeof group !== "object" || Array.isArray(group)) {
+        continue;
+      }
+      for (const [pkg, lastUpdated] of Object.entries(group as LogEntry)) {
+        push("abandoned-package", `${datasource}:${pkg}`, {
+          datasource,
+          package: pkg,
+          lastUpdated,
+        });
+      }
+    }
   }
 
   // log-warn — by level.
@@ -257,23 +267,6 @@ function collectFindings(
       if (typeof problem !== "string") continue;
       if (warnLogMessages.has(problem)) continue;
       push("repo-problem", problem, { problem });
-    }
-  }
-
-  // branch-error — any branchesInformation[].result === "error".
-  if (Array.isArray(entry.branchesInformation)) {
-    for (const branch of entry.branchesInformation) {
-      if (
-        branch !== null &&
-        typeof branch === "object" &&
-        (branch as LogEntry).result === "error"
-      ) {
-        const branchName =
-          typeof (branch as LogEntry).branchName === "string"
-            ? ((branch as LogEntry).branchName as string)
-            : "(unknown branch)";
-        push("branch-error", branchName, { branchName, result: "error" });
-      }
     }
   }
 }

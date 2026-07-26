@@ -27,7 +27,7 @@ interface DetectErrorsArgs {
  */
 export const detectErrorsCommand: CommandModule<object, DetectErrorsArgs> = {
   command: "detect-errors <path>",
-  describe: "Detect build-breaking problems in a Renovate log (CI-friendly)",
+  describe: "Detect hidden problems in a Renovate log (CI-friendly)",
   builder: (yargs) =>
     yargs
       .positional("path", {

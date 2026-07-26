@@ -1,6 +1,21 @@
 # renovate-log-parser
 
-A CLI that parses Renovate Bot debug logs to auto-detect issues in scheduled Renovate runs, or interactively diagnose issues with your coding agent, or manually via web UI.
+`renovate-log-parser` is a CLI and web interface for manual and automated analyses of Renovate Bot debug logs (JSONL-formatted), which you get by either downloading a run's log from [https://developer.mend.io](https://developer.mend.io) (if you use Mend's _hosted_ GitHub app), or by setting the `LOG_FILE` environment variable for self-hosted Renovate.
+
+`renovate-log-parser` offers the following commands:
+
+- `detect-errors` is meant for CI pipelines; it scans the log for build-breaking problems and warnings and exits with error, helping you detect and solve hidden Renovate issues you would otherwise miss
+- `analyze` (with a corresponding SKILL.md) tells your coding agent (Codex, Copilot, Claude Code, etc.) about the log's structure, allowing it to efficiently read only the most relevant log lines in a token-efficient way, so that it can quickly (and cheaply) diagnose Renovate problems
+- `web` starts a temporary local web server that parses the log and serves a browser-based interface that you use to analyze and filter Renovate logs of _any_ length; this solves the problem of tedious, manual “grep”-like analyses where your text editor chokes on too large files
+
+## Background (why do I need this)
+
+This tool was born out of the need to solve various problems, such as:
+
+- Setting up Renovate in a project with many repositories (and development teams) is easy. But over time, subtle problems creep in that no one seems to notice. For instance, Renovate might stop creating PRs for intricate reasons, and it only posts a small notice-block about this problem to the _Dependency dashboard_ GitHub issue. Unfortunately, the development teams use _Jira_ for issues and never look at GitHub issues, so the problems remain unnoticed.
+- In practice, developers sometimes have problems with Renovate Bot. They wonder why Renovate does not do certain things (even though they think it should), or they are annoyed that Renovate does certain things they don't want it to do. Manual analysis (given the huge debug-level log) is very difficult for non-experts, as important information is often buried in _debug_\-level log lines rather than warning- or error-level log lines. And AI agents miss important information in large log files, or spend enormous amounts of tokens for the analysis. As a consequence, people tend to accept a sub-optimal Renovate configuration or become frustrated with Renovate in general.
+
+Consequently, a tool was needed that detects such subtle problems automatically, and that simplifies manual and AI-assisted analyses of Renovate log files.
 
 ## Usage
 
@@ -47,15 +62,26 @@ renovate-log-parser detect-errors renovate.jsonl [--out report.json] \
 | `--ignore-file`  | `./renovate-log-parser.ignore.json` | Ignore-rules file (a missing file means no rules) |
 | `--fail-on-warn` | `false`                             | Make warning findings affect the exit code        |
 
-**Exit codes:** `0` = no non-ignored errors · `1` = ≥1 non-ignored error (or, with
-`--fail-on-warn`, ≥1 non-ignored warning) · `2` = tool/usage error (bad path,
-unreadable, bad args, malformed ignore file).
+**Exit codes:**
 
-**Detected categories** — errors: `host-error-abort`, `log-warn`
-(level 40), `log-error` (level 50),
-`log-fatal` (level 60), `err-object`, `config-migration`; `repo-problem`, `branch-error`, plus the reserved `abandoned-package`
-(always 0 for now). The JSON report's `counts` map always lists every category
-(zeros included) for stable run-over-run diffing in CI.
+- `0` = no non-ignored errors
+- `1` = ≥1 non-ignored error (or, with `--fail-on-warn`, ≥1 non-ignored warning)
+- `2` = tool/usage error (bad path, unreadable, bad args, malformed ignore file)
+
+**Detected categories**:
+
+- **Errors** (things Renovate would _not_ otherwise flag in a PR comment):
+  - `host-error-abort`: when Renovate skipped creating/updating PRs for a repository because one or more well-known registries were unreachable; looks for a `Repository finished` entry with `result: "external-host-error"`
+  - `log-error`: lines with error level (level=50)
+  - `log-fatal`: lines with fatal level (level=60)
+  - `config-migration`: when a repository needs a renovate.json migration; looks for a `Config migration necessary` entry carrying `oldConfig` + `newConfig`
+  - `abandoned-package`: when a repository contains one or more abandoned packages for which Renovate would not create a PR; reports one finding per package in an `Abandoned package statistics` entry
+- **Warnings**:
+  - `log-warn`: lines with warning level (level=40)
+  - `err-object`: reports lines with an `err` object, such as rawExec errors
+  - `repo-problem`: reports entries in `repoProblems` lines (which is a string-array)
+
+The JSON report's `counts` map always lists every category (zeros included) for stable run-over-run diffing in CI.
 
 **Ignore file** — silence expected findings with stable keys (line numbers shift
 as logs grow). A finding is ignored iff an active rule matches on `category` AND

@@ -9,9 +9,10 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { Parser } from "../parser.js";
 
 function writeTempLog(lines: string[]): { dir: string; path: string } {
@@ -90,4 +91,102 @@ test("parser reuses a valid cache on reload", () => {
   }
 });
 
-// TODO(Q25): add cache-invalidation-on-content-change and orphan-cleanup tests.
+test("parser re-parses (does not reuse a stale cache) when content changes", () => {
+  // The cache key is the md5 of the file *content*, so editing the file in
+  // place must produce a fresh md5/dbPath and a cache miss — never the old rows.
+  const nonce = `${Date.now()}-${Math.random()}`;
+  const { dir, path } = writeTempLog([
+    JSON.stringify({ level: 30, msg: `first-${nonce}` }),
+  ]);
+  const first = new Parser();
+  const second = new Parser();
+  let firstDbPath: string | undefined;
+  let secondDbPath: string | undefined;
+  try {
+    const a = first.load(path);
+    firstDbPath = a.dbPath;
+    assert.equal(a.cached, false);
+    assert.equal(a.totalLines, 1);
+    first.close();
+
+    // Overwrite the same path with different (and longer) content.
+    writeFileSync(
+      path,
+      [
+        JSON.stringify({ level: 30, msg: `second-${nonce}` }),
+        JSON.stringify({ level: 40, msg: `third-${nonce}` }),
+      ].join("\n") + "\n",
+    );
+
+    const b = second.load(path);
+    secondDbPath = b.dbPath;
+    // Changed content => new md5, new cache file, and a cache miss.
+    assert.notEqual(b.md5, a.md5);
+    assert.notEqual(b.dbPath, a.dbPath);
+    assert.equal(b.cached, false);
+    assert.equal(b.totalLines, 2);
+
+    // The reused handle reflects the new content, not the old cache.
+    const rows = second.queryEntries<{ msg: string }>(
+      "SELECT line, logentry FROM logs ORDER BY rowid",
+    );
+    assert.equal(rows[0].entry.msg, `second-${nonce}`);
+    assert.equal(rows[1].entry.msg, `third-${nonce}`);
+  } finally {
+    first.close();
+    second.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (firstDbPath) rmSync(firstDbPath, { force: true });
+    if (secondDbPath) rmSync(secondDbPath, { force: true });
+  }
+});
+
+test("load() deletes orphaned zero-row caches but keeps valid ones", () => {
+  // A crashed parse leaves a cache with a `logs` table but zero rows; load()
+  // runs cleanupOrphans() and must remove it while preserving valid caches.
+  const nonce = `${Date.now()}-${Math.random()}`;
+  const { dir, path } = writeTempLog([
+    JSON.stringify({ level: 30, msg: `valid-${nonce}` }),
+  ]);
+  const parser = new Parser();
+  const secondParser = new Parser();
+
+  const orphanPath = join(
+    tmpdir(),
+    `renovate-log-parser-orphan-${Date.now()}-${Math.floor(
+      Math.random() * 1e9,
+    )}.db`,
+  );
+
+  let validDbPath: string | undefined;
+  try {
+    // First load builds a valid cache for our log.
+    const a = parser.load(path);
+    validDbPath = a.dbPath;
+    parser.close();
+    assert.ok(existsSync(validDbPath));
+
+    // Only now plant a valid-but-empty SQLite orphan: same naming scheme, real
+    // `logs` table, zero rows — exactly what isValidCache rejects via `n > 0`.
+    // (Created after the first load so that load's own cleanup can't pre-empt.)
+    const orphanDb = new DatabaseSync(orphanPath);
+    orphanDb.exec(
+      "CREATE TABLE logs (line INTEGER PRIMARY KEY, logentry TEXT NOT NULL)",
+    );
+    orphanDb.close();
+    assert.ok(existsSync(orphanPath));
+
+    // Second load triggers cleanupOrphans(): the orphan goes, the valid cache
+    // (reused as a hit) stays.
+    const b = secondParser.load(path);
+    assert.equal(b.cached, true);
+    assert.equal(existsSync(orphanPath), false);
+    assert.ok(existsSync(validDbPath));
+  } finally {
+    parser.close();
+    secondParser.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (validDbPath) rmSync(validDbPath, { force: true });
+    rmSync(orphanPath, { force: true });
+  }
+});

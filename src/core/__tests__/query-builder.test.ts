@@ -183,4 +183,27 @@ test("inSet with no values degrades to a presence/no-op check", () => {
   );
 });
 
-// TODO(Q25): add level-filter edge cases once fixtures are available.
+test("levelIn builds an IN clause against the level expression", () => {
+  const { sql, params } = buildQuery([{ type: "levelIn", levels: [50, 60] }]);
+  assert.match(sql, /json_extract\(logentry, '\$\."level"'\) IN \(\?, \?\)/);
+  assert.deepEqual(params, [50, 60]);
+});
+
+test("negated levelIn is null-safe", () => {
+  const { sql, params } = buildQuery([
+    { type: "levelIn", levels: [40], negate: true },
+  ]);
+  assert.match(
+    sql,
+    /json_extract\(logentry, '\$\."level"'\) IS NULL OR .* NOT IN \(\?\)/,
+  );
+  assert.deepEqual(params, [40]);
+});
+
+test("levelIn with no levels degrades to a match-nothing/everything guard", () => {
+  assert.match(buildQuery([{ type: "levelIn", levels: [] }]).sql, /WHERE 1=0/);
+  assert.match(
+    buildQuery([{ type: "levelIn", levels: [], negate: true }]).sql,
+    /WHERE 1=1/,
+  );
+});
