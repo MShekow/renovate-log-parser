@@ -4,7 +4,7 @@
  *
  *  - {@link Analyzer.stats} — a single pass over the whole log summarising level
  *    counts and per-repository structure (line spans, branches, dependency
- *    inventory, repo problems). Rendered as pretty JSON by the command.
+ *    inventory, repo problems). Rendered as compact single-line JSON by the command.
  *  - {@link Analyzer.print} — a filtered, line-ranged, limited slice of the log
  *    projected to JSONL, with ignored root fields stripped. Selection order is
  *    line-range -> filters -> limit, mirroring the source log's order.
@@ -50,7 +50,7 @@ export interface RepoStats {
   packageNames: string[];
 }
 
-/** Whole-log statistics emitted in stats mode (pretty JSON). */
+/** Whole-log statistics emitted in stats mode (compact single-line JSON). */
 export interface AnalyzeStats {
   logFile: string;
   md5: string;

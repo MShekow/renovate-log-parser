@@ -22,7 +22,7 @@ interface AnalyzeArgs {
 /**
  * `analyze <path>` — emit token-efficient structure for an AI coding agent.
  *
- * Without `--print` it prints pretty-JSON whole-log stats (level counts +
+ * Without `--print` it prints compact single-line JSON whole-log stats (level counts +
  * per-repository structure). With `--print` it streams a filtered, line-ranged,
  * limited JSONL slice to stdout (truncation notices go to stderr so stdout stays
  * clean).
@@ -115,7 +115,7 @@ export const analyzeCommand: CommandModule<object, AnalyzeArgs> = {
         }
       } else {
         const stats = analyzer.stats();
-        process.stdout.write(JSON.stringify(stats, null, 2) + "\n");
+        process.stdout.write(JSON.stringify(stats) + "\n");
       }
     } catch (err) {
       // Tool/usage error (bad path, unreadable, bad --filter token, …).

@@ -155,7 +155,7 @@ decision only at \`debug\` (\`20\`). Filter to a level with \`--filter level:20\
 function statsFields(): string {
   return `## Reading the stats output
 
-Stats mode prints one pretty-JSON object:
+Stats mode prints one compact single-line JSON object:
 
 - \`logFile\`, \`md5\`, \`totalLines\` — identity and size of the log.
 - \`levelCounts\` — number of entries per numeric \`level\` (see the table above).

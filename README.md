@@ -109,7 +109,7 @@ excluded from the summary counts and the exit code.
 ### `analyze <path>`
 
 Emits token-efficient structure for an AI coding agent (or a human). Without
-`--print` it writes pretty-JSON whole-log **stats** to stdout; with `--print` it
+`--print` it writes compact single-line JSON whole-log **stats** to stdout; with `--print` it
 streams a filtered, line-ranged, limited **JSONL** slice of the log (one entry
 per line). The intended loop is: read the stats, pick the interesting line
 range, then `--print` just that range — reading only what you need.
