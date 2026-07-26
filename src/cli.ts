@@ -4,6 +4,7 @@ import { hideBin } from "yargs/helpers";
 import { detectErrorsCommand } from "./commands/detect-errors.js";
 import { analyzeCommand } from "./commands/analyze.js";
 import { webCommand } from "./commands/web.js";
+import { installAnalyzeSkillCommand } from "./commands/install-analyze-skill.js";
 
 await yargs(hideBin(process.argv))
   .scriptName("renovate-log-parser")
@@ -11,6 +12,7 @@ await yargs(hideBin(process.argv))
   .command(detectErrorsCommand)
   .command(analyzeCommand)
   .command(webCommand)
+  .command(installAnalyzeSkillCommand)
   .demandCommand(1, "You need to specify a command. Try --help.")
   .strict()
   .alias("h", "help")

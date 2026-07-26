@@ -163,6 +163,46 @@ matching (e.g. `msg:*lock file*`).
 **Exit codes:** `0` = success · `2` = tool/usage error (bad path, unreadable, bad
 filter token).
 
+### `install-analyze-skill`
+
+Writes (or updates) a `renovate-log-analyzer` **SKILL.md** that teaches an AI
+coding agent (Codex, Copilot, Claude Code, …) how to drive the `analyze` command
+token-efficiently. It can optionally embed instructions for fetching the
+log from GitHub self-hosted Renovate workflows via the `gh` CLI.
+
+The command is interactive by default: it asks whether to install the skill
+**locally** or **globally**, and whether to include the GitHub-fetch section
+(and if so, the base URL, organization, repository, and Renovate workflow
+filename). All answers can also be supplied as flags to run non-interactively
+(e.g. in CI); any flag you pass skips its prompt.
+
+```bash
+# Interactive
+npx renovate-log-parser install-analyze-skill
+
+# Non-interactive, local, with a GitHub Enterprise fetch section
+npx renovate-log-parser install-analyze-skill --scope local --with-gh \
+  --gh-base-url github.example.com \
+  --gh-org acme --gh-repo app --gh-workflow renovate.yml
+```
+
+The skill is written to
+`<root>/.agents/skills/renovate-log-analyzer/SKILL.md`, where `<root>` is the
+current working directory (`local`) or your home directory (`global`).
+
+| Arg / option    | Default        | Description                                                            |
+| --------------- | -------------- | ---------------------------------------------------------------------- |
+| `--scope`       | (prompt)       | `local` (`<cwd>/.agents/skills`) or `global` (`~/.agents/skills`)      |
+| `--with-gh`     | (prompt)       | Include a "fetch logs from GitHub via `gh`" section                    |
+| `--gh-base-url` | (prompt if gh) | GitHub Enterprise host (e.g. `github.example.com`); blank = github.com |
+| `--gh-org`      | (prompt if gh) | GitHub organization/owner                                              |
+| `--gh-repo`     | (prompt if gh) | Repository name                                                        |
+| `--gh-workflow` | (prompt if gh) | Filename of the workflow that runs Renovate (e.g. `renovate.yml`)      |
+| `--yes`         | `false`        | Skip all prompts; fail if a required answer is missing                 |
+
+**Exit codes:** `0` = success · `2` = tool/usage error (missing required answer
+when non-interactive, or a write failure).
+
 ### `web`
 
 Starts the bundled [Nuxt](https://nuxt.com) web UI (with [Nuxt UI](https://ui.nuxt.com)
