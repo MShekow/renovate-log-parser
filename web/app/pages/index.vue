@@ -16,6 +16,8 @@ const OVERSCAN = 10
 const route = useRoute()
 const log = useLog()
 const filters = useFilters()
+const findings = useFindings()
+const toast = useToast()
 const { total, ready, error: rowsError, rows, reload, ensureRange } = useRows(
   () => filters.serialized.value
 )
@@ -60,6 +62,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', measure)
   clearTimeout(refetchTimer)
+  clearTimeout(highlightTimer)
 })
 
 // --- Log loading -----------------------------------------------------------
@@ -83,6 +86,7 @@ watch(
     await nextTick()
     measure()
     ensureRange(startIndex.value, endIndex.value)
+    void findings.load()
   }
 )
 
@@ -127,6 +131,57 @@ const selectedRow = ref<RowDTO | null>(null)
 function openDetails(row: RowDTO) {
   selectedRow.value = row
   detailsOpen.value = true
+}
+
+// --- Problems panel + jump-to-line -----------------------------------------
+const problemsOpen = ref(false)
+
+/** The source line currently highlighted after a jump (flash + brief persist). */
+const highlightedLine = ref<number | null>(null)
+let highlightTimer: ReturnType<typeof setTimeout> | undefined
+function highlightLine(line: number) {
+  highlightedLine.value = line
+  clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => {
+    highlightedLine.value = null
+  }, 2600)
+}
+
+/** Scroll the target source line into view (~1/3 from the top) and prefetch it. */
+function scrollToLine(line: number) {
+  const target = line * ROW_HEIGHT - viewportH.value * 0.3
+  const maxTop = Math.max(0, totalHeight.value - viewportH.value)
+  const top = Math.min(Math.max(0, target), maxTop)
+  scrollTop.value = top
+  scroller.value?.scrollTo({ top })
+  ensureRange(startIndex.value, endIndex.value)
+}
+
+/**
+ * Jump to a finding's source line. Any active filters are cleared first so the
+ * line is guaranteed present and its result-index equals its source line (the
+ * unfiltered list is line-ordered and complete). The clear is done inline —
+ * bypassing the debounced refetch — so the scroll lands on fresh data.
+ */
+async function jumpToLine(line: number) {
+  if (filters.activeCount.value > 0) {
+    suppressRefetch = true
+    filters.clearAll()
+    await nextTick()
+    suppressRefetch = false
+    clearTimeout(refetchTimer)
+    scrollTop.value = 0
+    scroller.value?.scrollTo({ top: 0 })
+    await reload()
+    await nextTick()
+    toast.add({
+      title: `Cleared filters to reveal line ${line}`,
+      icon: 'i-lucide-filter-x',
+      color: 'info'
+    })
+  }
+  scrollToLine(line)
+  highlightLine(line)
 }
 
 // --- Header level breakdown ------------------------------------------------
@@ -190,6 +245,31 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
       </div>
 
       <div class="ml-auto flex items-center gap-2">
+        <UButton
+          v-if="log.info.value"
+          color="neutral"
+          variant="subtle"
+          size="sm"
+          :icon="findings.total.value > 0 ? 'i-lucide-shield-alert' : 'i-lucide-shield-check'"
+          :loading="findings.loading.value"
+          @click="problemsOpen = true"
+        >
+          Problems
+          <UBadge
+            v-if="findings.errorCount.value > 0"
+            :label="findings.errorCount.value.toLocaleString()"
+            color="error"
+            variant="solid"
+            size="sm"
+          />
+          <UBadge
+            v-if="findings.warningCount.value > 0"
+            :label="findings.warningCount.value.toLocaleString()"
+            color="warning"
+            variant="solid"
+            size="sm"
+          />
+        </UButton>
         <FieldsFilterMenu v-if="log.info.value" />
         <UButton
           icon="i-lucide-folder-open"
@@ -297,6 +377,7 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
           <LogRow
             v-if="item.row"
             :row="item.row"
+            :highlighted="highlightedLine !== null && item.row._oL === highlightedLine"
             @open="openDetails(item.row)"
           />
           <div
@@ -314,6 +395,11 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
     <DetailsSlideover
       v-model:open="detailsOpen"
       :row="selectedRow"
+    />
+
+    <FindingsSlideover
+      v-model:open="problemsOpen"
+      @jump="jumpToLine"
     />
   </div>
 </template>

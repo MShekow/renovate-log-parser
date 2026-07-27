@@ -2,6 +2,7 @@
  * Shared frontend types for the log viewer.
  */
 import type { Filter } from 'renovate-core/filters'
+import type { Category, Finding } from 'renovate-core/error-detector'
 
 /**
  * A single row as returned by `GET /api/rows`. It is the original log entry with
@@ -33,6 +34,16 @@ export interface RowsResponse {
   offset: number
   limit: number
   rows: RowDTO[]
+}
+
+/** A single finding as returned by `GET /api/findings` (core `Finding` minus `details`). */
+export type FindingDTO = Omit<Finding, 'details'>
+
+/** Shape of the `GET /api/findings` response (core report minus per-finding `details`). */
+export interface FindingsResponse {
+  summary: { errorCount: number, warningCount: number }
+  counts: Record<Category, number>
+  findings: FindingDTO[]
 }
 
 /**

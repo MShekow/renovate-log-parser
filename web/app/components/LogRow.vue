@@ -11,7 +11,7 @@ import { levelMeta } from 'renovate-core/levels'
 import type { ContextMenuItem } from '@nuxt/ui'
 import type { RowDTO } from '~/types'
 
-const props = defineProps<{ row: RowDTO }>()
+const props = defineProps<{ row: RowDTO, highlighted?: boolean }>()
 const emit = defineEmits<{ open: [] }>()
 
 const filters = useFilters()
@@ -153,7 +153,7 @@ const hasMenu = computed(() => menuItems.value.length > 0)
   >
     <div
       class="group flex items-center gap-1.5 h-full pl-1.5 pr-3 text-sm border-b border-default/40"
-      :class="hasDetails ? 'cursor-pointer hover:bg-elevated/50' : ''"
+      :class="[hasDetails ? 'cursor-pointer hover:bg-elevated/50' : '', highlighted ? 'log-row--highlight' : '']"
       @click="hasDetails && emit('open')"
     >
       <!-- Expand affordance on the left (only when the row has extra detail). -->
@@ -178,3 +178,25 @@ const hasMenu = computed(() => menuItems.value.length > 0)
     </div>
   </UContextMenu>
 </template>
+
+<style scoped>
+/*
+ * Jump-to-line landing highlight: a quick flash that settles into a subtle
+ * tinted persist (the parent clears the `highlighted` prop after ~2.6s).
+ */
+.log-row--highlight {
+  animation: log-row-flash 2.6s ease-out;
+}
+
+@keyframes log-row-flash {
+  0% {
+    background-color: var(--ui-primary);
+  }
+  15% {
+    background-color: color-mix(in oklch, var(--ui-primary) 35%, transparent);
+  }
+  100% {
+    background-color: color-mix(in oklch, var(--ui-primary) 12%, transparent);
+  }
+}
+</style>

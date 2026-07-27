@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { Parser } from 'renovate-core/parser'
 import { extractExpr } from 'renovate-core/filters'
+import { ErrorDetector, type DetectionReport } from 'renovate-core/error-detector'
 
 /** A single cached, loaded log. */
 interface RegistryEntry {
@@ -24,6 +25,12 @@ interface RegistryEntry {
   path: string
   /** The open parser / SQLite handle for this log. */
   parser: Parser
+  /**
+   * Lazily-computed error-detector report, memoized per entry. A given md5's
+   * findings never change, so the first request computes it and later ones reuse
+   * it.
+   */
+  report?: DetectionReport
 }
 
 /** Public metadata returned to the client after a successful load. */
@@ -127,6 +134,24 @@ function loadInto(absolutePath: string): LoadedLogInfo {
  * The GET routes call this first.
  */
 export function requireCurrentParser(): Parser {
+  return requireCurrentEntry().parser
+}
+
+/**
+ * Return the error-detector report for the current log, computing (and caching)
+ * it on first request. Runs without ignore rules — the web surfaces every
+ * finding. Throws a 409 when no log is loaded (via {@link requireCurrentEntry}).
+ */
+export function requireCurrentFindings(): DetectionReport {
+  const entry = requireCurrentEntry()
+  if (!entry.report) {
+    entry.report = new ErrorDetector(entry.parser).run()
+  }
+  return entry.report
+}
+
+/** Resolve the current registry entry, or throw a 409 when none is loaded. */
+function requireCurrentEntry(): RegistryEntry {
   if (current === null) {
     throw createError({
       statusCode: 409,
@@ -139,7 +164,7 @@ export function requireCurrentParser(): Parser {
     current = null
     throw createError({ statusCode: 409, statusMessage: 'No log is loaded.' })
   }
-  return entry.parser
+  return entry
 }
 
 /** Count entries per numeric `level` via a single grouped SQL scan. */
