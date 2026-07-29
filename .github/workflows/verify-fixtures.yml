@@ -67,6 +67,9 @@ jobs:
         with:
           scenario: failed-dotnet-install
           compose-files: -f compose.yml -f compose.failed-dotnet-install.yml
+          # Note: the token has permissions as explained on
+          # https://docs.renovatebot.com/modules/platform/github/#running-using-a-fine-grained-token
+          # for the MShekow/renovate-log-parser-test repository.
           token: ${{ secrets.TEST_REPO_PAT }}
 
   cleanup:
