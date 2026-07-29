@@ -33,7 +33,7 @@ jobs:
     name: various-issues (no host blocked)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/renovate-scenario
         with:
           scenario: various-issues
@@ -49,7 +49,7 @@ jobs:
     # sequential execution.
     if: ${{ !cancelled() }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/renovate-scenario
         with:
           scenario: external-host-error
@@ -62,7 +62,7 @@ jobs:
     needs: external-host-error
     if: ${{ !cancelled() }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/renovate-scenario
         with:
           scenario: failed-dotnet-install
@@ -80,8 +80,8 @@ jobs:
     # repository must be left pristine even if everything above blew up.
     if: always()
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/github-script@v9
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.TEST_REPO_PAT }}
           script: await require('./.github/scripts/cleanup-renovate-prs.cjs')({github, context, core})
