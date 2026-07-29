@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 0,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group Nuxt and Nuxt UI updates into a single PR",
+      "matchPackageNames": ["nuxt", "@nuxt/ui"],
+      "groupName": "nuxt",
+    },
+    {
+      "description": "Renovate's Docker image is tagged latest on purpose to reduce PRs/commits -> no digest pinning needed",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["renovate/renovate"],
+      "pinDigests": false,
+    },
+  ],
+  "automerge": true,
+}
