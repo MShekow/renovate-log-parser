@@ -252,7 +252,7 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
           size="sm"
           :icon="findings.total.value > 0 ? 'i-lucide-shield-alert' : 'i-lucide-shield-check'"
           :loading="findings.loading.value"
-          @click="problemsOpen = true"
+          @click="() => { problemsOpen = true }"
         >
           Problems
           <UBadge
