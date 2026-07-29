@@ -152,6 +152,7 @@ const hasMenu = computed(() => menuItems.value.length > 0)
     :ui="{ content: 'w-56' }"
   >
     <div
+      data-testid="log-row"
       class="group flex items-center gap-1.5 h-full pl-1.5 pr-3 text-sm border-b border-default/40"
       :class="[hasDetails ? 'cursor-pointer hover:bg-elevated/50' : '', highlighted ? 'log-row--highlight' : '']"
       @click="hasDetails && emit('open')"

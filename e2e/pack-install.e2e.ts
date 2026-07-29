@@ -13,25 +13,33 @@
  * person who installs the package.
  *
  * The suite builds, packs, and installs exactly once (in `before`), then runs
- * the CLI against a committed fixture. `web` is deliberately out of scope for
- * now; only the presence of its build output is asserted.
+ * the CLI against a committed fixture. The nested "web UI" block additionally
+ * starts the installed `web` command and drives the real UI in a headless
+ * Chromium via the `playwright-core` library — no second test runner, these are
+ * plain `node:test` cases like the rest of the file.
  *
  * Run with `npm run test:e2e` (not part of `npm test` — the Nuxt build makes it
- * slow). Set `SKIP_E2E=1` to skip.
+ * slow). Set `SKIP_E2E=1` to skip. The browser tests need Chromium installed
+ * once via `npx playwright-core install chromium`; screenshots and page dumps
+ * for failing browser tests are written to `<root>/e2e-artifacts`.
  */
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import {
   mkdtempSync,
+  mkdirSync,
   rmSync,
   existsSync,
   writeFileSync,
   readFileSync,
   copyFileSync,
 } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { chromium, type Browser, type Page } from "playwright-core";
 
 /** Repository root (this file lives in `<root>/e2e`). */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -252,5 +260,225 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
     for (const line of lines) {
       assert.equal(typeof JSON.parse(line), "object");
     }
+  });
+
+  /**
+   * Browser-level tests for the `web` command.
+   *
+   * Nested inside `packaged CLI` on purpose: the outer `before` has already
+   * built, packed and installed the tarball, so these drive the *published*
+   * web bundle rather than the repo's build tree. That upgrades the "the
+   * `.output` files exist" assertion above into "the bundle actually boots and
+   * serves a working UI" — which is where the `renovate-core` alias inlining
+   * and the Nitro build would break.
+   *
+   * The URL used here (`/?log=<absolute path>`) is exactly the one the CLI
+   * itself hands to the browser when invoked as `web <path>`.
+   */
+  describe("web UI", () => {
+    /** Where screenshots/HTML dumps of failing browser tests are written. */
+    const ARTIFACT_DIR = join(REPO_ROOT, "e2e-artifacts");
+    /** Booting Nitro and loading the fixture is slower than a CLI invocation. */
+    const WEB_TEST_TIMEOUT_MS = 60 * 1000;
+
+    let server: ChildProcess | undefined;
+    let browser: Browser | undefined;
+    let page: Page | undefined;
+    let baseUrl: string;
+    /** Everything the CLI + Nitro wrote, for failure diagnostics. */
+    let serverOutput = "";
+    /** Browser console messages, reset per test, for failure diagnostics. */
+    let consoleMessages: string[] = [];
+
+    /** Ask the OS for a free port so a busy 3000 cannot break the suite. */
+    const freePort = async (): Promise<number> =>
+      new Promise((resolvePort, reject) => {
+        const probe = createServer();
+        probe.on("error", reject);
+        probe.listen(0, "127.0.0.1", () => {
+          const address = probe.address();
+          if (address === null || typeof address === "string") {
+            reject(new Error("could not determine a free port"));
+            return;
+          }
+          const { port } = address;
+          probe.close(() => resolvePort(port));
+        });
+      });
+
+    /** Poll the server until it answers, so tests never race the Nitro boot. */
+    const waitForServer = async (url: string, timeoutMs: number) => {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) return;
+        } catch {
+          // Not listening yet.
+        }
+        if (Date.now() > deadline) {
+          throw new Error(
+            `web server did not become ready within ${timeoutMs}ms\n` +
+              `--- server output ---\n${serverOutput}`,
+          );
+        }
+        await delay(250);
+      }
+    };
+
+    before(async () => {
+      const port = await freePort();
+      baseUrl = `http://127.0.0.1:${port}`;
+
+      // `--no-open` is essential: `--open` defaults to true and would spawn a
+      // real browser (xdg-open/open) on the machine running the tests.
+      server = spawn(
+        cli,
+        [
+          "web",
+          "--no-open",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          String(port),
+          // Deliberately no log path — each test navigates to `?log=` itself.
+        ],
+        { cwd: projectDir, stdio: ["ignore", "pipe", "pipe"] },
+      );
+      server.stdout?.on("data", (chunk: Buffer) => {
+        serverOutput += chunk.toString();
+      });
+      server.stderr?.on("data", (chunk: Buffer) => {
+        serverOutput += chunk.toString();
+      });
+
+      await waitForServer(`${baseUrl}/`, CLI_TIMEOUT_MS);
+      assert.match(
+        serverOutput,
+        new RegExp(`Starting renovate-log-parser web UI on ${baseUrl}`),
+        "the web command did not announce its base URL",
+      );
+
+      try {
+        browser = await chromium.launch({
+          // GitHub runners and containers are happier without the sandbox; the
+          // only content loaded is our own localhost server.
+          args: process.env.CI ? ["--no-sandbox"] : [],
+        });
+      } catch (error) {
+        throw new Error(
+          "could not launch Chromium — install it once with " +
+            "`npx playwright-core install chromium`",
+          { cause: error },
+        );
+      }
+      page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      page.on("console", (message) => {
+        consoleMessages.push(`[${message.type()}] ${message.text()}`);
+      });
+    });
+
+    after(async () => {
+      // Guarded individually: a failure in `before` must not leak a browser or
+      // a server process into CI.
+      if (browser) await browser.close();
+      if (server && server.exitCode === null) {
+        const exited = new Promise<void>((resolveExit) =>
+          server?.once("exit", () => resolveExit()),
+        );
+        // The CLI forwards SIGTERM to its Nitro child, so this also exercises
+        // the shutdown path in src/commands/web.ts.
+        server.kill("SIGTERM");
+        await Promise.race([exited, delay(10_000)]);
+        if (server.exitCode === null) server.kill("SIGKILL");
+      }
+    });
+
+    /**
+     * Define a browser test that dumps a screenshot, the rendered HTML and the
+     * captured console output to `e2e-artifacts/` before rethrowing. Without a
+     * Playwright runner there is no trace viewer, so this is the only forensic
+     * trail a CI failure leaves behind.
+     */
+    const webTest = (name: string, body: (page: Page) => Promise<void>) => {
+      test(name, { timeout: WEB_TEST_TIMEOUT_MS }, async () => {
+        assert.ok(page, "browser page was not created");
+        consoleMessages = [];
+        try {
+          await body(page);
+        } catch (error) {
+          const slug = name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+          try {
+            mkdirSync(ARTIFACT_DIR, { recursive: true });
+            await page.screenshot({
+              path: join(ARTIFACT_DIR, `${slug}.png`),
+              fullPage: true,
+            });
+            writeFileSync(
+              join(ARTIFACT_DIR, `${slug}.html`),
+              await page.content(),
+            );
+            writeFileSync(
+              join(ARTIFACT_DIR, `${slug}.log`),
+              `--- browser console ---\n${consoleMessages.join("\n")}\n` +
+                `--- server output ---\n${serverOutput}\n`,
+            );
+          } catch (captureError) {
+            console.error("failed to capture artifacts:", captureError);
+          }
+          throw error;
+        }
+      });
+    };
+
+    /** The URL the CLI opens for `renovate-log-parser web <path>`. */
+    const logUrl = () => `${baseUrl}/?log=${encodeURIComponent(fixture)}`;
+
+    webTest("loads the log handed over via ?log= and renders it", async (p) => {
+      await p.goto(logUrl());
+
+      // Header shows the loaded path: proves the frontend read `?log=` and the
+      // server accepted POST /api/log/path.
+      await p.getByText(fixture, { exact: true }).waitFor();
+      await p.getByText(/[\d,]+ lines/).waitFor();
+
+      // Rows come from GET /api/rows and are virtualized, so the first one
+      // appearing means the whole read path works end to end.
+      const rows = p.getByTestId("log-row");
+      await rows.first().waitFor();
+      assert.ok(await rows.count(), "no log rows were rendered");
+      const firstRow = (await rows.first().innerText()).trim();
+      assert.ok(firstRow.length > 0, "the first log row rendered empty");
+
+      // The empty state must be gone once a log is loaded.
+      assert.equal(
+        await p.getByText("Open a Renovate JSONL log to begin.").count(),
+        0,
+        "the empty state is still showing after loading a log",
+      );
+    });
+
+    webTest("lists findings and jumps to the source line", async (p) => {
+      await p.goto(logUrl());
+      await p.getByText(fixture, { exact: true }).waitFor();
+
+      await p.getByRole("button", { name: /Problems/ }).click();
+
+      const dialog = p.getByRole("dialog");
+      await dialog.waitFor();
+      const items = dialog.getByTestId("finding-item");
+      await items.first().waitFor();
+      // The same fixture yields >= 3 `abandoned-package` findings via the CLI
+      // (asserted above), so the UI must not come up empty either.
+      assert.ok(
+        (await items.count()) >= 3,
+        "the Problems panel listed fewer findings than the CLI reports",
+      );
+
+      // Clicking a finding closes the panel and jumps to its source line,
+      // which flashes the target row via the `highlighted` prop.
+      await items.first().click();
+      await p.locator(".log-row--highlight").waitFor();
+    });
   });
 });

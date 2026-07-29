@@ -275,6 +275,9 @@ node dist/cli.js --help
 npm test           # Unit + fixture tests (fast; no build, no network)
 npm run test:fixtures  # Only the fixture tests
 npm run test:e2e   # Packaging E2E tests (slow: builds, packs, installs)
+
+# One-off, needed by the browser tests inside the E2E suite:
+npx playwright-core install chromium
 ```
 
 Three suites, each catching a different failure class:
@@ -303,8 +306,17 @@ Three suites, each catching a different failure class:
   `renovate-log-parser` binary against a fixture. This is the only suite that
   can catch a missing `package.json#files` entry, a dropped Nuxt `.output`
   symlink, or a `dist/` import that only resolved because `src/` sat next to it.
-  (E2E coverage for the `web` command is deferred; only the presence of its
-  build output is asserted.) Set `SKIP_E2E=1` to skip.
+  Set `SKIP_E2E=1` to skip.
+
+  Its nested `web UI` block starts the installed `web` command and drives the
+  real UI in a headless Chromium, using the `playwright-core` _library_ — there
+  is no second test runner or config file, these are plain `node:test` cases in
+  the same file. Because they run against the installed tarball, they assert
+  that the shipped Nuxt bundle actually boots and serves, not merely that its
+  files are present. Chromium must be installed once with
+  `npx playwright-core install chromium`; when a browser test fails, a
+  screenshot, an HTML dump and the captured console/server output are written to
+  `e2e-artifacts/` (CI uploads them as a build artifact).
 
 ### Regenerating the log fixtures
 

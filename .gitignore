@@ -146,3 +146,6 @@ vite.config.ts.timestamp-*
 
 # Playwright-related files
 .playwright-cli
+
+# Screenshots/HTML dumps from failing browser E2E tests
+e2e-artifacts/

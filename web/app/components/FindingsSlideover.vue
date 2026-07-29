@@ -177,6 +177,7 @@ const description = computed(() => {
                 <li
                   v-for="(f, i) in visibleItems(group)"
                   :key="i"
+                  data-testid="finding-item"
                   class="flex items-start gap-2 px-3 py-1.5 text-xs hover:bg-elevated/50 cursor-pointer"
                   @click="onJump(f.line)"
                 >

@@ -38,5 +38,19 @@ jobs:
       - name: Unit and fixture tests
         run: npm test
 
+      # The browser binary comes with `npm ci` via playwright-core's cache only
+      # if already present, so install it explicitly; `--with-deps` pulls the
+      # shared libraries headless Chromium needs on the Ubuntu runner.
+      - name: Install Chromium for the web E2E tests
+        run: npx playwright-core install --with-deps chromium
+
       - name: Packaging E2E tests
         run: npm run test:e2e
+
+      - name: Upload browser E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-artifacts
+          path: e2e-artifacts/
+          if-no-files-found: ignore
