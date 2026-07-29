@@ -1,0 +1,67 @@
+# Publishes the package to npm whenever a `v*` tag is pushed. Authentication
+# uses npm trusted publishing (OIDC), so no npm token is needed - the package
+# must have this repository + workflow registered as a trusted publisher.
+name: CD
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for OIDC-based trusted publishing and provenance attestation.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: "package.json"
+          package-manager-cache: false
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing requires npm 11.5.1 or newer, which is not
+      # necessarily what the runner's Node ships with.
+      - name: Ensure a recent npm
+        run: npm install --global npm@latest
+
+      - run: npm ci
+
+      - name: Derive version from the tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not a valid semver version tag" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Overwrite package.json's version so the repository does not have to
+      # carry the released version in a commit; the tag is the source of truth.
+      - name: Set package version
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Unit and fixture tests
+        run: npm test
+
+      - name: Publish
+        run: npm publish --provenance --access public

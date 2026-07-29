@@ -31,6 +31,17 @@
     "test:e2e": "node --import tsx --test --test-concurrency=1 \"e2e/**/*.e2e.ts\"",
     "prepublishOnly": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MShekow/renovate-log-parser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MShekow/renovate-log-parser/issues"
+  },
+  "homepage": "https://github.com/MShekow/renovate-log-parser#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "renovate",
     "logs",
