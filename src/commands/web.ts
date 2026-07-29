@@ -12,12 +12,20 @@ interface WebArgs {
 }
 
 /**
- * Resolve the prebuilt Nitro server entry that ships inside this package.
- * Layout after `tsc`: dist/commands/web.js  →  ../../web/.output/server/index.mjs
+ * Resolve the Express server entry that ships inside this package.
+ * Layout after `tsc`: dist/commands/web.js  →  ../server/server-main.js
  */
 function resolveServerEntry(): string {
+  return fileURLToPath(new URL("../server/server-main.js", import.meta.url));
+}
+
+/**
+ * Resolve the statically-rendered SPA that the server serves.
+ * Layout after `tsc`: dist/commands/web.js  →  ../../web/.output/public
+ */
+function resolveSpaIndex(): string {
   return fileURLToPath(
-    new URL("../../web/.output/server/index.mjs", import.meta.url),
+    new URL("../../web/.output/public/index.html", import.meta.url),
   );
 }
 
@@ -39,11 +47,12 @@ function openBrowser(url: string): void {
 }
 
 /**
- * `web` — starts the bundled Nuxt (Nitro) production server.
+ * `web` — starts the bundled Express server, which serves the JSON API and the
+ * statically-rendered Nuxt SPA.
  */
 export const webCommand: CommandModule<object, WebArgs> = {
   command: "web [path]",
-  describe: "Start the Nuxt-based web UI",
+  describe: "Start the web UI",
   builder: (yargs) =>
     yargs
       .positional("path", {
@@ -67,12 +76,18 @@ export const webCommand: CommandModule<object, WebArgs> = {
       }),
   handler: (argv) => {
     const serverEntry = resolveServerEntry();
+    const spaIndex = resolveSpaIndex();
 
-    if (!existsSync(serverEntry)) {
+    const missing = !existsSync(serverEntry)
+      ? serverEntry
+      : !existsSync(spaIndex)
+        ? spaIndex
+        : null;
+    if (missing) {
       console.error(
         "The web UI has not been built yet.\n" +
-          "Expected server bundle at:\n  " +
-          serverEntry +
+          "Missing:\n  " +
+          missing +
           '\nRun "npm run build" from the package source before using the "web" command.',
       );
       process.exitCode = 1;
@@ -102,13 +117,11 @@ export const webCommand: CommandModule<object, WebArgs> = {
         ...process.env,
         PORT: String(argv.port),
         HOST: argv.host,
-        NITRO_PORT: String(argv.port),
-        NITRO_HOST: argv.host,
       },
     });
 
     if (argv.open) {
-      // Give Nitro a moment to bind before opening the browser.
+      // Give the server a moment to bind before opening the browser.
       setTimeout(() => openBrowser(openUrl), 1000);
     }
 

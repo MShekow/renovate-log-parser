@@ -8,9 +8,9 @@
  *
  * That is a distinct failure class from anything the other suites can catch.
  * A missing entry in `package.json#files`, a `dist/` import that resolves only
- * because `src/` happens to sit next to it, a Nuxt `.output` symlink that npm
- * silently drops — all of those pass every in-repo test and break for the first
- * person who installs the package.
+ * because `src/` happens to sit next to it, a build artifact that never made it
+ * into the tarball — all of those pass every in-repo test and break for the
+ * first person who installs the package.
  *
  * The suite builds, packs, and installs exactly once (in `before`), then runs
  * the CLI against a committed fixture. The nested "web UI" block additionally
@@ -18,8 +18,8 @@
  * Chromium via the `playwright-core` library — no second test runner, these are
  * plain `node:test` cases like the rest of the file.
  *
- * Run with `npm run test:e2e` (not part of `npm test` — the Nuxt build makes it
- * slow). Set `SKIP_E2E=1` to skip. The browser tests need Chromium installed
+ * Run with `npm run test:e2e` (not part of `npm test` — the frontend build makes
+ * it slow). Set `SKIP_E2E=1` to skip. The browser tests need Chromium installed
  * once via `npx playwright-core install chromium`; screenshots and page dumps
  * for failing browser tests are written to `<root>/e2e-artifacts`.
  */
@@ -179,12 +179,16 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
       existsSync(join(pkgRoot, "dist", "cli.js")),
       "dist/cli.js is missing from the tarball",
     );
-    // Guards `package.json#files` and scripts/deref-output-symlinks.mjs: npm
-    // does not follow symlinks into a tarball, so a regression here ships an
-    // empty web bundle that only shows up when someone runs `web`.
     assert.ok(
-      existsSync(join(pkgRoot, "web", ".output", "server", "index.mjs")),
-      "web/.output/server/index.mjs is missing from the tarball",
+      existsSync(join(pkgRoot, "dist", "server", "server-main.js")),
+      "dist/server/server-main.js is missing from the tarball",
+    );
+    // Guards `package.json#files`: the static SPA is gitignored build output,
+    // so a regression here ships a server with nothing to serve — which only
+    // shows up when someone runs `web`.
+    assert.ok(
+      existsSync(join(pkgRoot, "web", ".output", "public", "index.html")),
+      "web/.output/public/index.html is missing from the tarball",
     );
   });
 
@@ -267,10 +271,10 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
    *
    * Nested inside `packaged CLI` on purpose: the outer `before` has already
    * built, packed and installed the tarball, so these drive the *published*
-   * web bundle rather than the repo's build tree. That upgrades the "the
-   * `.output` files exist" assertion above into "the bundle actually boots and
-   * serves a working UI" — which is where the `renovate-core` alias inlining
-   * and the Nitro build would break.
+   * web bundle rather than the repo's build tree. That upgrades the "the built
+   * files exist" assertion above into "the server actually boots and serves a
+   * working UI" — which is where the `renovate-core` alias inlining, the static
+   * SPA fallback, or the Express API wiring would break.
    *
    * The URL used here (`/?log=<absolute path>`) is exactly the one the CLI
    * itself hands to the browser when invoked as `web <path>`.
@@ -278,14 +282,14 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
   describe("web UI", () => {
     /** Where screenshots/HTML dumps of failing browser tests are written. */
     const ARTIFACT_DIR = join(REPO_ROOT, "e2e-artifacts");
-    /** Booting Nitro and loading the fixture is slower than a CLI invocation. */
+    /** Booting the server and loading the fixture is slower than a CLI run. */
     const WEB_TEST_TIMEOUT_MS = 60 * 1000;
 
     let server: ChildProcess | undefined;
     let browser: Browser | undefined;
     let page: Page | undefined;
     let baseUrl: string;
-    /** Everything the CLI + Nitro wrote, for failure diagnostics. */
+    /** Everything the CLI + server wrote, for failure diagnostics. */
     let serverOutput = "";
     /** Browser console messages, reset per test, for failure diagnostics. */
     let consoleMessages: string[] = [];
@@ -306,7 +310,7 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
         });
       });
 
-    /** Poll the server until it answers, so tests never race the Nitro boot. */
+    /** Poll the server until it answers, so tests never race the server boot. */
     const waitForServer = async (url: string, timeoutMs: number) => {
       const deadline = Date.now() + timeoutMs;
       for (;;) {
@@ -386,7 +390,7 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
         const exited = new Promise<void>((resolveExit) =>
           server?.once("exit", () => resolveExit()),
         );
-        // The CLI forwards SIGTERM to its Nitro child, so this also exercises
+        // The CLI forwards SIGTERM to its server child, so this also exercises
         // the shutdown path in src/commands/web.ts.
         server.kill("SIGTERM");
         await Promise.race([exited, delay(10_000)]);

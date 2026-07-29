@@ -31,7 +31,7 @@ npx renovate-log-parser detect-errors path/to/renovate.jsonl --out report.json
 # Emit token-efficient stats for an AI coding agent
 npx renovate-log-parser analyze path/to/renovate.jsonl
 
-# Explore a log interactively in the Nuxt-based web UI
+# Explore a log interactively in the web UI
 npx renovate-log-parser web path/to/renovate.jsonl
 ```
 
@@ -205,9 +205,11 @@ when non-interactive, or a write failure).
 
 ### `web`
 
-Starts the bundled [Nuxt](https://nuxt.com) web UI (with [Nuxt UI](https://ui.nuxt.com)
-and Nuxt's built-in Nitro server) for interactive, filtered log exploration. Pass
-an optional log path to open it automatically; otherwise use the in-app file
+Starts the bundled web UI for interactive, filtered log exploration: a
+statically-rendered [Nuxt](https://nuxt.com) SPA (with
+[Nuxt UI](https://ui.nuxt.com)) served by a small
+[Express](https://expressjs.com) server that also exposes the `/api` endpoints.
+Pass an optional log path to open it automatically; otherwise use the in-app file
 picker. The server keeps the parsed log in memory (SQLite-backed) and streams
 paged rows to the client.
 
@@ -248,8 +250,8 @@ collapsible JSON tree of the full entry.
 
 ## Development
 
-This repository is an npm workspace: the publishable CLI lives at the root and
-the Nuxt app lives in [`web/`](./web).
+This repository is an npm workspace: the publishable CLI and the Express web
+server live at the root (`src/`), the Nuxt frontend lives in [`web/`](./web).
 
 ```bash
 # Install all workspace dependencies
@@ -259,10 +261,12 @@ npm install
 npm run dev:cli -- detect-errors path/to/renovate.jsonl
 npm run dev:cli -- web
 
-# Run the Nuxt app in dev mode (HMR) directly
-npm run dev:web
+# Run the web UI in dev mode: two processes, in two terminals.
+# The Nuxt dev server (HMR) proxies /api to the Express server on port 3001.
+npm run dev:api   # Express API on :3001 (tsx watch)
+npm run dev:web   # Nuxt dev server on :3000
 
-# Build everything (Nuxt .output + compiled CLI)
+# Build everything (static SPA in web/.output/public + compiled CLI)
 npm run build
 
 # Run the compiled CLI
@@ -304,15 +308,15 @@ Three suites, each catching a different failure class:
 - **Packaging E2E tests** (`e2e/pack-install.e2e.ts`) — build, `npm pack`,
   install the tarball into an empty throwaway project, then drive the installed
   `renovate-log-parser` binary against a fixture. This is the only suite that
-  can catch a missing `package.json#files` entry, a dropped Nuxt `.output`
-  symlink, or a `dist/` import that only resolved because `src/` sat next to it.
+  can catch a missing `package.json#files` entry or a `dist/` import that only
+  resolved because `src/` sat next to it.
   Set `SKIP_E2E=1` to skip.
 
   Its nested `web UI` block starts the installed `web` command and drives the
   real UI in a headless Chromium, using the `playwright-core` _library_ — there
   is no second test runner or config file, these are plain `node:test` cases in
   the same file. Because they run against the installed tarball, they assert
-  that the shipped Nuxt bundle actually boots and serves, not merely that its
+  that the shipped server actually boots and serves the SPA, not merely that its
   files are present. Chromium must be installed once with
   `npx playwright-core install chromium`; when a browser test fails, a
   screenshot, an HTML dump and the captured console/server output are written to
@@ -367,34 +371,42 @@ npm run format:check  # Prettier check (no writes — useful in CI)
 ### How it's built
 
 - **CLI** — TypeScript compiled with `tsc` to ESM in `dist/`. Uses
-  [`yargs`](https://yargs.js.org) for command parsing. `yargs` is the only
-  runtime dependency.
-- **Web** — a Nuxt UI app built with `nuxt build`. It shares the CLI's parsing
-  and filtering logic from `src/core/` (aliased into the bundle as
-  `renovate-core`), so the browser and the CLI query the same SQLite-backed
-  model. The `web` command runs the self-contained Nitro server
-  (`web/.output/server/index.mjs`) as a child process; when given a log path it
-  hands it off to the UI via a `?log=` query parameter.
+  [`yargs`](https://yargs.js.org) for command parsing.
+- **Frontend** — a Nuxt UI app built with `nuxt generate` and `ssr: false`, i.e.
+  a purely client-side SPA: `web/.output/public` holds an app shell plus static
+  assets, and nothing of Nitro/h3 is shipped or run. It shares the CLI's
+  filtering model and level metadata from `src/core/` (aliased into the bundle
+  as `renovate-core`), so the browser and the CLI speak about the same
+  SQLite-backed model.
+- **Backend** — a plain Express server in [`src/server/`](./src/server),
+  compiled by the same `tsc` pass as the CLI. It imports `src/core/` through
+  ordinary relative imports (no bundler, no alias), serves the `/api` routes
+  from `api.ts`, and serves the static SPA with an `index.html` fallback so
+  client-side routing works. `log-registry.ts` holds the process-wide "current
+  log" (one open `Parser`/SQLite handle per loaded md5, plus a memoized error
+  report). The `web` command spawns `dist/server/server-main.js` as a child
+  process; when given a log path it hands it off to the UI via a `?log=` query
+  parameter.
 
 ### What gets published
 
 Two `package.json` mechanisms cooperate so that both build outputs ship to npm:
 
-- **`files: ["dist", "web/.output"]`** — an allow-list of what goes into the
+- **`files: ["dist", "web/.output/public"]`** — an allow-list of what goes into the
   published tarball. npm always adds `package.json`, `README`, `LICENSE`, and the
   `bin` target, then includes everything matched here — both directories,
   recursively. This list takes precedence over `.gitignore`, which is why
   `web/.output/` (gitignored as a build artifact) is still published.
 - **`prepublishOnly: "npm run build"`** — a lifecycle hook npm runs automatically
-  before packing on `npm publish`. It builds the Nuxt `.output` and compiles the
-  CLI `dist`, so both directories exist and are current by the time the `files`
-  allow-list is evaluated.
+  before packing on `npm publish`. It generates the static SPA and compiles the
+  CLI + server `dist`, so both directories exist and are current by the time the
+  `files` allow-list is evaluated.
 
 ```
 npm publish
-  └─ prepublishOnly → npm run build → build:web (nuxt build → web/.output/)
-                                    → build:cli (tsc        → dist/)
-  └─ pack tarball using `files`: dist/ + web/.output/ (+ package.json, README, LICENSE)
+  └─ prepublishOnly → npm run build → build:web (nuxt generate → web/.output/public/)
+                                    → build:cli (tsc           → dist/)
+  └─ pack tarball using `files`: dist/ + web/.output/public/ (+ package.json, README, LICENSE)
   └─ upload to registry
 ```
 

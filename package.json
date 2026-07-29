@@ -1,6 +1,6 @@
 {
   "name": "renovate-log-parser",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A CLI that parses Renovate Bot debug logs to auto-detect issues, with an optional Nuxt-based web UI.",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "files": [
     "dist",
-    "web/.output"
+    "web/.output/public"
   ],
   "engines": {
     "node": ">=24"
@@ -19,8 +19,9 @@
   "scripts": {
     "build": "npm run build:web && npm run build:cli",
     "build:cli": "tsc -p tsconfig.build.json",
-    "build:web": "npm run build --workspace web && node scripts/deref-output-symlinks.mjs",
+    "build:web": "npm run build --workspace web",
     "dev:cli": "tsx src/cli.ts",
+    "dev:api": "tsx watch src/server/server-main.ts --port 3001",
     "dev:web": "npm run dev --workspace web",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -50,10 +51,12 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "express": "5.2.1",
     "yargs": "18.1.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@types/express": "5.0.6",
     "@types/node": "26.1.1",
     "@types/yargs": "17.0.35",
     "eslint": "10.8.0",

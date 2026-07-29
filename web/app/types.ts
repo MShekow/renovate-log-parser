@@ -69,7 +69,7 @@ export interface RepositoriesWire {
 /**
  * The reactive filter object sent (URL-encoded JSON) as the `filters` query
  * param to `GET /api/rows`. It mirrors the server-side `FilterWire` in
- * `web/server/utils/translate-filters.ts`. All keys are optional; an absent key
+ * `src/server/translate-filters.ts`. All keys are optional; an absent key
  * means "no constraint" (an empty object = the unfiltered view).
  */
 export interface FilterWire {

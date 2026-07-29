@@ -1,7 +1,7 @@
 /**
  * `useLog` — reactive lifecycle for the currently-loaded log.
  *
- * The Nitro backend is stateful: it holds one "current" log. This
+ * The backend is stateful: it holds one "current" log. This
  * composable is the client mirror of that pointer. It exposes the current log's
  * metadata plus the two ways to make a log current:
  *   - {@link loadFromPath} — POST an absolute path (used by the `?log=` handoff

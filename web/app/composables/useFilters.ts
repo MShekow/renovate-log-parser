@@ -5,7 +5,7 @@
  * same state.
  *
  * The state maps 1:1 onto the server's `filters` wire format (see
- * `web/server/utils/translate-filters.ts`):
+ * `src/server/translate-filters.ts`):
  *   - {@link levels}          -> `levelIn`   (empty = all levels)
  *   - {@link repoMode}/{@link repoValues}/{@link repoIndependent} -> `inSet` on `repository`
  *   - {@link ignoredFields}   -> response projection (which root keys to strip)
