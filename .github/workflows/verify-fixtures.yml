@@ -1,0 +1,84 @@
+# Regenerates every Renovate log fixture from a live Renovate run against
+# MShekow/renovate-log-parser-test, then re-runs the fixture tests against the
+# freshly generated logs.
+#
+# The point is *drift detection*: the committed fixtures encode what Renovate's
+# log looks like today. If a new Renovate release renames a message, drops a
+# field, or stops emitting a diagnostic entirely, this workflow turns red long
+# before a user hits it. Nothing is committed back — the regenerated log is
+# uploaded as an artifact so the fixture can be updated deliberately.
+#
+# Scenario jobs run strictly one after another (`needs:`), because they all
+# drive the same test repository. Each one starts by wiping every Renovate PR
+# and branch, so Renovate always sees a pristine repository; otherwise it would
+# report "Branch already exists" and skip the work the fixture captures.
+name: Verify log fixtures
+
+on:
+  schedule:
+    # Mondays, 04:00 UTC.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+# The scenarios share one test repository — never let two runs interleave.
+concurrency:
+  group: renovate-test-repo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  various-issues:
+    name: various-issues (no host blocked)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/renovate-scenario
+        with:
+          scenario: various-issues
+          compose-files: -f compose.yml
+          token: ${{ secrets.TEST_REPO_PAT }}
+
+  external-host-error:
+    name: external-host-error (npm blocked)
+    runs-on: ubuntu-latest
+    needs: various-issues
+    # Run even if the previous scenario failed, so one weekly run reports drift
+    # in *all* scenarios instead of stopping at the first. `needs` still forces
+    # sequential execution.
+    if: ${{ !cancelled() }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/renovate-scenario
+        with:
+          scenario: external-host-error
+          compose-files: -f compose.yml -f compose.external-host-error.yml
+          token: ${{ secrets.TEST_REPO_PAT }}
+
+  failed-dotnet-install:
+    name: failed-dotnet-install (dotnet CDN blocked)
+    runs-on: ubuntu-latest
+    needs: external-host-error
+    if: ${{ !cancelled() }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/renovate-scenario
+        with:
+          scenario: failed-dotnet-install
+          compose-files: -f compose.yml -f compose.failed-dotnet-install.yml
+          token: ${{ secrets.TEST_REPO_PAT }}
+
+  cleanup:
+    name: Clean up test repository
+    runs-on: ubuntu-latest
+    needs: failed-dotnet-install
+    # The last scenario has no successor to clean up after it, and the test
+    # repository must be left pristine even if everything above blew up.
+    if: always()
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.TEST_REPO_PAT }}
+          script: await require('./.github/scripts/cleanup-renovate-prs.cjs')({github, context, core})

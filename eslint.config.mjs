@@ -34,6 +34,30 @@ export default tseslint.config(
     },
   },
   {
+    // E2E tests build/pack/install the package and drive the resulting binary.
+    // They have their own tsconfig (see e2e/tsconfig.json) and are never built.
+    files: ["e2e/**/*.ts"],
+    extends: tseslint.configs.recommendedTypeChecked,
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+    },
+  },
+  {
+    // CommonJS helper executed by actions/github-script inside the runner.
+    files: [".github/scripts/**/*.cjs"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.commonjs },
+      sourceType: "commonjs",
+    },
+  },
+  {
     // node:test's `test()` returns a promise that is intentionally not awaited
     // when registered at the top level of a test file.
     files: ["src/**/*.test.ts"],

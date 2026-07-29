@@ -27,6 +27,8 @@
     "lint": "eslint . && npm run lint --workspace web",
     "start": "node dist/cli.js",
     "test": "node --import tsx --test --test-concurrency=1 \"src/**/*.test.ts\"",
+    "test:fixtures": "node --import tsx --test --test-concurrency=1 src/core/__tests__/fixtures.test.ts",
+    "test:e2e": "node --import tsx --test --test-concurrency=1 \"e2e/**/*.e2e.ts\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

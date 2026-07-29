@@ -269,6 +269,76 @@ npm run build
 node dist/cli.js --help
 ```
 
+### Testing
+
+```bash
+npm test           # Unit + fixture tests (fast; no build, no network)
+npm run test:fixtures  # Only the fixture tests
+npm run test:e2e   # Packaging E2E tests (slow: builds, packs, installs)
+```
+
+Three suites, each catching a different failure class:
+
+- **Unit tests** (`src/core/__tests__/*.test.ts`) — synthetic, hand-written
+  JSONL logs asserting the detection contracts in isolation.
+- **Fixture tests** (`src/core/__tests__/fixtures.test.ts`) — the full
+  Parser → ErrorDetector/Analyzer pipeline run over _real_ Renovate logs
+  captured against
+  [`MShekow/renovate-log-parser-test`](https://github.com/MShekow/renovate-log-parser-test)
+  and committed under `src/core/__tests__/fixtures/`:
+
+  | Fixture                       | What it demonstrates                                                                                                                                                 |
+  | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `external-host-error.jsonl`   | NPM registry blocked → the run aborts with `result: "external-host-error"`                                                                                           |
+  | `various-issues.jsonl`        | Abandoned packages, a required config migration, and an npm `lock file error` whose `err.stderr` reports a `Conflicting peer dependency`                             |
+  | `failed-dotnet-install.jsonl` | `builds.dotnet.microsoft.com` blocked → `Datasource connection error` (`DEPTH_ZERO_SELF_SIGNED_CERT`) and `Failed to generate lock file` / "No tool releases found." |
+
+  The assertions are deliberately _semantic_ rather than snapshot-based, since a
+  Renovate log is full of volatile data (timestamps, pid, hostname, logContext,
+  dependency versions). They assert only the signals each scenario was captured
+  to demonstrate.
+
+- **Packaging E2E tests** (`e2e/pack-install.e2e.ts`) — build, `npm pack`,
+  install the tarball into an empty throwaway project, then drive the installed
+  `renovate-log-parser` binary against a fixture. This is the only suite that
+  can catch a missing `package.json#files` entry, a dropped Nuxt `.output`
+  symlink, or a `dist/` import that only resolved because `src/` sat next to it.
+  (E2E coverage for the `web` command is deferred; only the presence of its
+  build output is asserted.) Set `SKIP_E2E=1` to skip.
+
+### Regenerating the log fixtures
+
+The [`compose.yml`](./compose.yml) stack runs Renovate against the test
+repository, with an NGINX "firewall" that Docker DNS points selected hostnames
+at, so outbound access to them fails exactly as it would behind a corporate
+proxy. The base file blocks nothing; each scenario layers on an override that
+adds the hostnames it needs to block:
+
+```bash
+# Requires a .env with GITHUB_PAT (+ optionally LOCAL_UID / LOCAL_GID)
+docker compose -f compose.yml up -d                                         # various-issues
+docker compose -f compose.yml -f compose.external-host-error.yml up -d      # external-host-error
+docker compose -f compose.yml -f compose.failed-dotnet-install.yml up -d    # failed-dotnet-install
+
+docker compose ... wait renovate        # block until Renovate exits
+cp container-out-logs/out.log src/core/__tests__/fixtures/<scenario>.jsonl
+docker compose ... down -v              # discard the generated certificate
+```
+
+Renovate must start from a _pristine_ repository — leftover `renovate/*`
+branches make it take a different code path ("Branch already exists") and skip
+the very work the fixture captures. Close and delete them first.
+
+[`.github/workflows/verify-fixtures.yml`](./.github/workflows/verify-fixtures.yml)
+automates all of this weekly (and on demand): one job per scenario, run strictly
+in sequence since they share one test repository, each starting by wiping every
+Renovate PR and branch. It overwrites the committed fixture with the freshly
+generated log and re-runs the fixture tests against it — so a Renovate release
+that renames a message or drops a field turns the workflow red. Nothing is
+committed back; the regenerated log is uploaded as an artifact so the fixture
+can be updated deliberately. The workflow needs a `TEST_REPO_PAT` secret (a
+fine-grained PAT with contents + pull-request write access to the test repo).
+
 ### Linting & formatting
 
 [ESLint](https://eslint.org) (flat config) and [Prettier](https://prettier.io) are set up at the workspace root.

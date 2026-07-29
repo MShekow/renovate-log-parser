@@ -1,0 +1,17 @@
+# Scenario override: block the .NET SDK download host.
+#
+# Renovate can still reach GitHub and NPM, so the repository run completes, but
+# `install-tool dotnet` fails while preparing the NuGet update. This produces
+# the buried `Datasource connection error` (DEPTH_ZERO_SELF_SIGNED_CERT, because
+# the firewall terminates TLS with its own certificate) and the subsequent
+# `Failed to generate lock file` / "No tool releases found." entries asserted by
+# the `failed-dotnet-install` fixture test.
+#
+#   docker compose -f compose.yml -f compose.failed-dotnet-install.yml up -d
+#
+services:
+  firewall:
+    networks:
+      default:
+        aliases:
+          - builds.dotnet.microsoft.com

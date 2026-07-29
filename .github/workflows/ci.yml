@@ -1,0 +1,42 @@
+# Fast feedback on every push and pull request: lint, formatting, unit and
+# fixture tests, plus the packaging E2E suite.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: 'package.json'
+          package-manager-cache: false
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Unit and fixture tests
+        run: npm test
+
+      - name: Packaging E2E tests
+        run: npm run test:e2e

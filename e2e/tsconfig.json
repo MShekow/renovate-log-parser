@@ -1,0 +1,12 @@
+{
+  // E2E tests live outside `src` and are never emitted, so they get their own
+  // project rather than widening the build's rootDir.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["**/*.ts"]
+}

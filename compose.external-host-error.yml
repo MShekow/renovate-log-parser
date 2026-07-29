@@ -1,0 +1,18 @@
+# Scenario override: block the public NPM registry.
+#
+# Renovate cannot resolve any npm dependency, which makes it abort the whole
+# repository run with `result: "external-host-error"` — the signal asserted by
+# the `external-host-error` fixture test.
+#
+#   docker compose -f compose.yml -f compose.external-host-error.yml up -d
+#
+services:
+  firewall:
+    networks:
+      default:
+        aliases:
+          # Docker DNS resolves these to NGINX, which answers every request
+          # with a static "Access blocked" page over a self-signed certificate.
+          - npmjs.org
+          - www.npmjs.org
+          - registry.npmjs.org

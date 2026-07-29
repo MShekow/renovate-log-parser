@@ -1,0 +1,101 @@
+# Runs one Renovate fixture scenario end to end: wipe the test repository, run
+# Renovate through Docker Compose, overwrite the committed fixture with the
+# freshly produced log, and re-run the fixture tests against it.
+#
+# Factored into a composite action because the three scenario jobs in
+# verify-fixtures.yml differ only in which Compose override file they layer on.
+name: Renovate fixture scenario
+description: Regenerate one Renovate log fixture and verify the fixture tests still pass against it.
+
+inputs:
+  scenario:
+    description: Scenario name; also the fixture basename (e.g. various-issues).
+    required: true
+  compose-files:
+    description: The `-f` flags selecting the base Compose file plus any scenario override.
+    required: true
+  token:
+    description: Fine-grained PAT with contents + pull-request write access to the test repository.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Start from a pristine test repository: leftover Renovate branches from a
+    # previous scenario would make Renovate take a different code path and
+    # produce a log that no longer matches the fixture.
+    - name: Delete leftover Renovate PRs and branches
+      uses: actions/github-script@v9
+      with:
+        github-token: ${{ inputs.token }}
+        script: await require('./.github/scripts/cleanup-renovate-prs.cjs')({github, context, core})
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: 'package.json'
+        package-manager-cache: false
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Write Compose environment
+      shell: bash
+      env:
+        TEST_REPO_PAT: ${{ inputs.token }}
+      run: |
+        # The Renovate entrypoint chowns the log back to this uid/gid so the
+        # following steps can read it without sudo.
+        {
+          echo "GITHUB_PAT=${TEST_REPO_PAT}"
+          echo "LOCAL_UID=$(id -u)"
+          echo "LOCAL_GID=$(id -g)"
+        } > .env
+
+    - name: Run Renovate
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker compose ${{ inputs.compose-files }} up -d
+        # `wait` blocks until the service exits and forwards its exit code.
+        # A non-zero Renovate exit is expected in the blocked-host scenarios and
+        # is not itself a failure — the fixture test is the gate.
+        exit_code=0
+        docker compose ${{ inputs.compose-files }} wait renovate || exit_code=$?
+        echo "Renovate exited with code ${exit_code}"
+
+    - name: Collect Renovate logs
+      shell: bash
+      if: always()
+      run: |
+        docker compose ${{ inputs.compose-files }} logs --no-color renovate > renovate-container-stdout.txt || true
+        docker compose ${{ inputs.compose-files }} down -v
+
+    - name: Overwrite the committed fixture
+      shell: bash
+      run: |
+        set -euo pipefail
+        log=container-out-logs/out.log
+        test -s "$log" || { echo "::error::Renovate produced no log at $log"; exit 1; }
+        cp "$log" "src/core/__tests__/fixtures/${{ inputs.scenario }}.jsonl"
+        echo "Regenerated fixture: $(wc -l < "$log") lines"
+        # Informational only — a diff is expected (timestamps, pids, versions).
+        git --no-pager diff --stat -- "src/core/__tests__/fixtures/${{ inputs.scenario }}.jsonl" || true
+
+    - name: Upload regenerated log
+      uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: ${{ inputs.scenario }}-log
+        path: |
+          container-out-logs/out.log
+          renovate-container-stdout.txt
+        if-no-files-found: warn
+        retention-days: 30
+
+    # The gate. Failing here means Renovate's output no longer carries a signal
+    # the fixture test asserts: download the artifact above, confirm the change
+    # is genuine, then update the committed fixture.
+    - name: Verify fixture tests against the regenerated log
+      shell: bash
+      run: npm run test:fixtures
