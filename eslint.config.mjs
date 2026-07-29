@@ -27,13 +27,6 @@ export default tseslint.config(
     },
   },
   {
-    // Build/tooling scripts run under Node (ESM) and use console/process.
-    files: ["scripts/**/*.mjs"],
-    languageOptions: {
-      globals: globals.node,
-    },
-  },
-  {
     // E2E tests build/pack/install the package and drive the resulting binary.
     // They have their own tsconfig (see e2e/tsconfig.json) and are never built.
     files: ["e2e/**/*.ts"],
