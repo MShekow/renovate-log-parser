@@ -7,6 +7,7 @@
 - `detect-errors` is meant for CI pipelines; it scans the log for build-breaking problems and warnings and exits with error, helping you detect and solve hidden Renovate issues you would otherwise miss
 - `analyze` (with a corresponding SKILL.md) tells your coding agent (Codex, Copilot, Claude Code, etc.) about the log's structure, allowing it to efficiently read only the most relevant log lines in a token-efficient way, so that it can quickly (and cheaply) diagnose Renovate problems
 - `web` starts a temporary local web server that parses the log and serves a browser-based interface that you use to analyze and filter Renovate logs of _any_ length; this solves the problem of tedious, manual “grep”-like analyses where your text editor chokes on too large files
+- `install-analyze-skill` (run `npx renovate-log-parser install-analyze-skill`) writes that SKILL.md into your project or home directory, optionally including instructions for pulling the log straight from your GitHub Actions Renovate runs — so your agent knows both how to get a log and how to read it
 
 ## Background (why do I need this)
 
