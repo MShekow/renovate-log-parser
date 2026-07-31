@@ -16,7 +16,6 @@ interface InstallSkillArgs {
   scope?: string;
   "with-gh"?: boolean;
   "gh-base-url"?: string;
-  "gh-org"?: string;
   "gh-repo"?: string;
   "gh-workflow"?: string;
   yes: boolean;
@@ -61,13 +60,10 @@ export const installAnalyzeSkillCommand: CommandModule<
         describe:
           "GitHub Enterprise host for the gh section (e.g. github.example.com); omit for github.com",
       })
-      .option("gh-org", {
-        type: "string",
-        describe: "GitHub organization/owner (gh section)",
-      })
       .option("gh-repo", {
         type: "string",
-        describe: "Repository name (gh section)",
+        describe:
+          'GitHub repository in "org/repo" form, e.g. acme/app (gh section)',
       })
       .option("gh-workflow", {
         type: "string",
@@ -164,15 +160,14 @@ async function resolveScope(
 
 /**
  * Resolve the optional GitHub-fetch config. `--with-gh` (or an interactive
- * yes/no) gates it; the org/repo/workflow are required once enabled, the base
- * URL is optional.
+ * yes/no) gates it; the repository ("org/repo") and workflow are required once
+ * enabled, the base URL is optional.
  */
 async function resolveGh(
   argv: InstallSkillArgs,
   rl: Rl | undefined,
 ): Promise<GhConfig | undefined> {
   const anyGhFlag =
-    argv["gh-org"] !== undefined ||
     argv["gh-repo"] !== undefined ||
     argv["gh-workflow"] !== undefined ||
     argv["gh-base-url"] !== undefined;
@@ -184,9 +179,12 @@ async function resolveGh(
     // gh details supplied without the boolean gate — treat as opt-in.
     include = true;
   } else if (rl) {
+    stdout.write(
+      "Assuming that you run self-hosted Renovate as a GitHub Actions workflow in a repository.\n",
+    );
     include = await promptYesNo(
       rl,
-      "Include instructions to fetch logs from GitHub via the gh CLI?",
+      "Include instructions to fetch that workflow's run logs via the gh CLI?",
       false,
     );
   } else {
@@ -195,17 +193,13 @@ async function resolveGh(
 
   if (!include) return undefined;
 
-  const org = await resolveRequired(
-    argv["gh-org"],
-    rl,
-    "GitHub organization/owner",
-    "--gh-org",
-  );
-  const repo = await resolveRequired(
-    argv["gh-repo"],
-    rl,
-    "Repository name",
-    "--gh-repo",
+  const { org, repo } = parseOrgRepo(
+    await resolveRequired(
+      argv["gh-repo"],
+      rl,
+      'GitHub repository ["org/repo"]',
+      "--gh-repo",
+    ),
   );
   const workflow = await resolveRequired(
     argv["gh-workflow"],
@@ -220,6 +214,15 @@ async function resolveGh(
   );
 
   return { org, repo, workflow, baseUrl: baseUrl || undefined };
+}
+
+/** Parse an `org/repo` slug into its parts. */
+function parseOrgRepo(value: string): { org: string; repo: string } {
+  const parts = value.trim().split("/");
+  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") {
+    throw new Error(`Invalid repository "${value}". Expected "org/repo".`);
+  }
+  return { org: parts[0], repo: parts[1] };
 }
 
 /** Resolve a required free-text answer from a flag or a prompt. */
