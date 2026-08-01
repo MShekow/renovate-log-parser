@@ -238,9 +238,23 @@ manual analysis, run:
 npx --yes renovate-log-parser detect-errors <path-to-log.jsonl>
 \`\`\`
 
-It surfaces host-error aborts, config migrations, abandoned packages, \`err\`
-objects, and \`repoProblems\` — a good starting list of what to investigate with
-\`analyze\`.
+**Detected categories** — a good starting list of what to investigate with \`analyze\`:
+
+- **Errors** (things Renovate would _not_ otherwise flag in a PR comment):
+  - \`host-error-abort\`: when Renovate skipped creating/updating PRs for a repository
+    because one or more well-known registries were unreachable; looks for a
+    \`Repository finished\` entry with \`result: "external-host-error"\`
+  - \`log-error\`: lines with error level (\`level=50\`)
+  - \`log-fatal\`: lines with fatal level (\`level=60\`)
+  - \`config-migration\`: when a repository needs a renovate.json migration; looks for a
+    \`Config migration necessary\` entry carrying \`oldConfig\` + \`newConfig\`
+  - \`abandoned-package\`: when a repository contains one or more abandoned packages for
+    which Renovate would not create a PR; reports one finding per package in an
+    \`Abandoned package statistics\` entry
+- **Warnings**:
+  - \`log-warn\`: lines with warning level (\`level=40\`)
+  - \`err-object\`: reports lines with an \`err\` object, such as rawExec errors
+  - \`repo-problem\`: reports entries in \`repoProblems\` lines (which is a string-array)
 `;
 }
 
