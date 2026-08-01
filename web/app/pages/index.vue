@@ -136,6 +136,9 @@ function openDetails(row: RowDTO) {
 // --- Problems panel + jump-to-line -----------------------------------------
 const problemsOpen = ref(false)
 
+/** The Help panel documenting the non-obvious affordances (context menus, …). */
+const helpOpen = ref(false)
+
 /** The source line currently highlighted after a jump (flash + brief persist). */
 const highlightedLine = ref<number | null>(null)
 let highlightTimer: ReturnType<typeof setTimeout> | undefined
@@ -280,6 +283,14 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
           :loading="log.loading.value"
           @click="pickFile"
         />
+        <UButton
+          icon="i-lucide-circle-question-mark"
+          label="Help"
+          color="neutral"
+          variant="subtle"
+          size="sm"
+          @click="() => { helpOpen = true }"
+        />
         <UColorModeButton />
         <input
           ref="fileInput"
@@ -401,5 +412,7 @@ const anyError = computed(() => log.error.value ?? rowsError.value)
       v-model:open="problemsOpen"
       @jump="jumpToLine"
     />
+
+    <HelpSlideover v-model:open="helpOpen" />
   </div>
 </template>

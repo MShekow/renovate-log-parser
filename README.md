@@ -277,6 +277,11 @@ collapsible JSON tree of the full entry.
   `field == value`; nested keys create a scoped "contains" search on their
   top-level ancestor).
 
+The affordances that cannot be discovered by looking — the two context menus
+above all, but also the pill click/✕ semantics, the `*` search rules and what
+"Hidden fields" actually does — are documented in the UI itself, behind the
+**Help** button in the header.
+
 ## Development
 
 This repository is an npm workspace: the publishable CLI and the Express web
