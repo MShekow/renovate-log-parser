@@ -1,5 +1,7 @@
 # renovate-log-parser
 
+![](./renovate-log-parser.webp)
+
 `renovate-log-parser` is a CLI and web interface for manual and automated analyses of Renovate Bot debug logs (JSONL-formatted), which you get by either downloading a run's log from [https://developer.mend.io](https://developer.mend.io) (if you use Mend's _hosted_ GitHub app), or by setting the `LOG_FILE` environment variable for self-hosted Renovate.
 
 `renovate-log-parser` offers the following commands:
@@ -8,6 +10,32 @@
 - `analyze` (with a corresponding SKILL.md) tells your coding agent (Codex, Copilot, Claude Code, etc.) about the log's structure, allowing it to efficiently read only the most relevant log lines in a token-efficient way, so that it can quickly (and cheaply) diagnose Renovate problems
 - `web` starts a temporary local web server that parses the log and serves a browser-based interface that you use to analyze and filter Renovate logs of _any_ length; this solves the problem of tedious, manual “grep”-like analyses where your text editor chokes on too large files
 - `install-analyze-skill` (run `npx renovate-log-parser install-analyze-skill`) writes that SKILL.md into your project or home directory, optionally including instructions for pulling the log straight from your GitHub Actions Renovate runs — so your agent knows both how to get a log and how to read it
+
+Want to try it right away? Grab an example log and open it in the web UI:
+
+```bash
+curl -sSLO https://raw.githubusercontent.com/MShekow/renovate-log-parser/main/src/core/__tests__/fixtures/various-issues.jsonl
+npx renovate-log-parser web various-issues.jsonl
+```
+
+<details>
+<summary>Or, if you prefer Docker (mounting the log into the container and mapping the port)</summary>
+
+```bash
+curl -sSLO https://raw.githubusercontent.com/MShekow/renovate-log-parser/main/src/core/__tests__/fixtures/various-issues.jsonl
+docker run --rm -it -p 3000:3000 -v "$PWD/various-issues.jsonl:/logs/various-issues.jsonl:ro" node:26-alpine \
+  npx -y renovate-log-parser web /logs/various-issues.jsonl --host 0.0.0.0 --no-open
+```
+
+Once the container reports that the server is listening, open the UI from a
+second terminal — the `?log=` parameter is the path _inside_ the container, and
+makes the UI load the file right away (`open` instead of `xdg-open` on macOS):
+
+```bash
+xdg-open "http://localhost:3000/?log=/logs/various-issues.jsonl"
+```
+
+</details>
 
 ## Background (why do I need this)
 
