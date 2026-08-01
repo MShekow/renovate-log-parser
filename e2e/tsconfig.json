@@ -6,7 +6,10 @@
     "rootDir": ".",
     "noEmit": true,
     "declaration": false,
-    "sourceMap": false
+    "sourceMap": false,
+    // `page.evaluate()` callbacks are type-checked against the browser's
+    // globals even though they are serialised, not run, on this side.
+    "lib": ["es2023", "dom"]
   },
   "include": ["**/*.ts"]
 }

@@ -22,6 +22,10 @@
  * it slow). Set `SKIP_E2E=1` to skip. The browser tests need Chromium installed
  * once via `npx playwright-core install chromium`; screenshots and page dumps
  * for failing browser tests are written to `<root>/e2e-artifacts`.
+ *
+ * The pixel-comparison cases at the end additionally require the frozen
+ * container environment — run them with `npm run test:e2e:screenshots`; see
+ * ./screenshot.ts.
  */
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -40,6 +44,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type Browser, type Page } from "playwright-core";
+import { SCREENSHOT_SKIP, assertScreenshot, stabilize } from "./screenshot.js";
 
 /** Repository root (this file lives in `<root>/e2e`). */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -284,6 +289,20 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
     const ARTIFACT_DIR = join(REPO_ROOT, "e2e-artifacts");
     /** Booting the server and loading the fixture is slower than a CLI run. */
     const WEB_TEST_TIMEOUT_MS = 60 * 1000;
+    /** Fixed for every page, because the baselines encode this exact size. */
+    const VIEWPORT = { width: 1280, height: 800 };
+
+    /**
+     * The header renders the loaded log's absolute path, so the pixel tests
+     * cannot use the fixture inside the randomly named install directory —
+     * that string differs on every run. They get their own copy at a fixed
+     * location instead, which keeps the header assertable rather than masked.
+     */
+    const SCREENSHOT_FIXTURE_DIR = join(tmpdir(), "rlp-screenshot-fixture");
+    const screenshotFixture = join(
+      SCREENSHOT_FIXTURE_DIR,
+      "various-issues.jsonl",
+    );
 
     let server: ChildProcess | undefined;
     let browser: Browser | undefined;
@@ -331,6 +350,11 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
     };
 
     before(async () => {
+      if (SCREENSHOT_SKIP === false) {
+        mkdirSync(SCREENSHOT_FIXTURE_DIR, { recursive: true });
+        copyFileSync(FIXTURE, screenshotFixture);
+      }
+
       const port = await freePort();
       baseUrl = `http://127.0.0.1:${port}`;
 
@@ -365,9 +389,13 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
 
       try {
         browser = await chromium.launch({
-          // GitHub runners and containers are happier without the sandbox; the
-          // only content loaded is our own localhost server.
-          args: process.env.CI ? ["--no-sandbox"] : [],
+          // GitHub runners and the screenshot container both lack the kernel
+          // privileges Chromium's sandbox wants; the only content loaded is
+          // our own localhost server.
+          args:
+            process.env.CI || process.env.RLP_E2E_CONTAINER
+              ? ["--no-sandbox"]
+              : [],
         });
       } catch (error) {
         throw new Error(
@@ -376,7 +404,7 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
           { cause: error },
         );
       }
-      page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      page = await browser.newPage({ viewport: VIEWPORT });
       page.on("console", (message) => {
         consoleMessages.push(`[${message.type()}] ${message.text()}`);
       });
@@ -396,14 +424,41 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
         await Promise.race([exited, delay(10_000)]);
         if (server.exitCode === null) server.kill("SIGKILL");
       }
+      rmSync(SCREENSHOT_FIXTURE_DIR, { recursive: true, force: true });
     });
 
     /**
-     * Define a browser test that dumps a screenshot, the rendered HTML and the
-     * captured console output to `e2e-artifacts/` before rethrowing. Without a
-     * Playwright runner there is no trace viewer, so this is the only forensic
-     * trail a CI failure leaves behind.
+     * Dump a screenshot, the rendered HTML and the captured console/server
+     * output for a failing browser test. Without a Playwright runner there is
+     * no trace viewer, so this is the only forensic trail a CI failure leaves.
      */
+    const captureArtifacts = async (
+      failed: Page,
+      name: string,
+      messages: string[],
+    ) => {
+      const slug = name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      try {
+        mkdirSync(ARTIFACT_DIR, { recursive: true });
+        await failed.screenshot({
+          path: join(ARTIFACT_DIR, `${slug}.png`),
+          fullPage: true,
+        });
+        writeFileSync(
+          join(ARTIFACT_DIR, `${slug}.html`),
+          await failed.content(),
+        );
+        writeFileSync(
+          join(ARTIFACT_DIR, `${slug}.log`),
+          `--- browser console ---\n${messages.join("\n")}\n` +
+            `--- server output ---\n${serverOutput}\n`,
+        );
+      } catch (captureError) {
+        console.error("failed to capture artifacts:", captureError);
+      }
+    };
+
+    /** Define a browser test that leaves artifacts behind when it fails. */
     const webTest = (name: string, body: (page: Page) => Promise<void>) => {
       test(name, { timeout: WEB_TEST_TIMEOUT_MS }, async () => {
         assert.ok(page, "browser page was not created");
@@ -411,28 +466,52 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
         try {
           await body(page);
         } catch (error) {
-          const slug = name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-          try {
-            mkdirSync(ARTIFACT_DIR, { recursive: true });
-            await page.screenshot({
-              path: join(ARTIFACT_DIR, `${slug}.png`),
-              fullPage: true,
-            });
-            writeFileSync(
-              join(ARTIFACT_DIR, `${slug}.html`),
-              await page.content(),
-            );
-            writeFileSync(
-              join(ARTIFACT_DIR, `${slug}.log`),
-              `--- browser console ---\n${consoleMessages.join("\n")}\n` +
-                `--- server output ---\n${serverOutput}\n`,
-            );
-          } catch (captureError) {
-            console.error("failed to capture artifacts:", captureError);
-          }
+          await captureArtifacts(page, name, consoleMessages);
           throw error;
         }
       });
+    };
+
+    /**
+     * Define a pixel-comparison test.
+     *
+     * Each one gets a fresh browser context: Nuxt UI persists the colour mode,
+     * so a preference left behind by an earlier case could otherwise decide
+     * whether a baseline is captured light or dark. Locale and time zone are
+     * pinned too — the header formats its line counts with `toLocaleString()`.
+     */
+    const screenshotTest = (
+      name: string,
+      body: (page: Page) => Promise<void>,
+    ) => {
+      test(
+        name,
+        { timeout: WEB_TEST_TIMEOUT_MS, skip: SCREENSHOT_SKIP },
+        async () => {
+          assert.ok(browser, "browser was not launched");
+          const context = await browser.newContext({
+            viewport: VIEWPORT,
+            deviceScaleFactor: 1,
+            colorScheme: "light",
+            reducedMotion: "reduce",
+            locale: "en-US",
+            timezoneId: "UTC",
+          });
+          const fresh = await context.newPage();
+          const messages: string[] = [];
+          fresh.on("console", (message) => {
+            messages.push(`[${message.type()}] ${message.text()}`);
+          });
+          try {
+            await body(fresh);
+          } catch (error) {
+            await captureArtifacts(fresh, name, messages);
+            throw error;
+          } finally {
+            await context.close();
+          }
+        },
+      );
     };
 
     /** The URL the CLI opens for `renovate-log-parser web <path>`. */
@@ -484,5 +563,88 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
       await items.first().click();
       await p.locator(".log-row--highlight").waitFor();
     });
+
+    /*
+     * Pixel comparison against the committed baselines in e2e/screenshots/.
+     *
+     * The cases above assert that the UI *works*; these assert that it still
+     * *looks* the way it was signed off — a CSS regression, a Nuxt UI upgrade
+     * that reflows the header, a level glyph losing its colour. None of that
+     * moves a locator, so nothing else in this repo can catch it.
+     *
+     * Skipped unless RLP_SCREENSHOTS is set; see ./screenshot.ts for why they
+     * are confined to the container built from e2e/Dockerfile.
+     */
+
+    /** Load the fixed-path fixture and wait until the view is fully settled. */
+    const openScreenshotLog = async (p: Page) => {
+      await p.goto(
+        `${baseUrl}/?log=${encodeURIComponent(screenshotFixture)}`,
+        // The rows arrive over XHR after navigation, so `load` is not enough.
+        { waitUntil: "networkidle" },
+      );
+      await p.getByText(screenshotFixture, { exact: true }).waitFor();
+      await p.getByText(/[\d,]+ lines/).waitFor();
+      await p.getByTestId("log-row").first().waitFor();
+    };
+
+    /**
+     * Park the pointer outside the app before capturing: whatever was clicked
+     * last would otherwise keep its `hover:` styling in the baseline.
+     */
+    const parkPointer = (p: Page) => p.mouse.move(0, 0);
+
+    screenshotTest("empty state renders pixel-identically", async (p) => {
+      await p.goto(baseUrl, { waitUntil: "networkidle" });
+      await p.getByText("Open a Renovate JSONL log to begin.").waitFor();
+
+      await stabilize(p);
+      await assertScreenshot(p, "empty-state");
+    });
+
+    screenshotTest("loaded log view renders pixel-identically", async (p) => {
+      await openScreenshotLog(p);
+
+      await stabilize(p);
+      await assertScreenshot(p, "log-loaded");
+    });
+
+    screenshotTest(
+      "problems slide-over renders pixel-identically",
+      async (p) => {
+        await openScreenshotLog(p);
+
+        await p.getByRole("button", { name: /Problems/ }).click();
+        const dialog = p.getByRole("dialog");
+        await dialog.waitFor();
+        await dialog.getByTestId("finding-item").first().waitFor();
+        await parkPointer(p);
+
+        await stabilize(p);
+        await assertScreenshot(p, "problems-slideover");
+      },
+    );
+
+    screenshotTest(
+      "details slide-over renders pixel-identically",
+      async (p) => {
+        await openScreenshotLog(p);
+
+        // Only rows carrying extra JSON open a panel, and those are exactly
+        // the ones LogRow marks clickable — so target that, not "the first
+        // row", which may well have nothing to show.
+        await p
+          .locator('[data-testid="log-row"].cursor-pointer')
+          .first()
+          .click();
+        const dialog = p.getByRole("dialog");
+        await dialog.waitFor();
+        await dialog.getByText(/^Line \d+$/).waitFor();
+        await parkPointer(p);
+
+        await stabilize(p);
+        await assertScreenshot(p, "details-slideover");
+      },
+    );
   });
 });

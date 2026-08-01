@@ -30,6 +30,8 @@
     "test": "node --import tsx --test --test-concurrency=1 \"src/**/*.test.ts\"",
     "test:fixtures": "node --import tsx --test --test-concurrency=1 src/core/__tests__/fixtures.test.ts",
     "test:e2e": "node --import tsx --test --test-concurrency=1 \"e2e/**/*.e2e.ts\"",
+    "test:e2e:screenshots": "sh e2e/run-in-container.sh compare",
+    "test:e2e:screenshots:update": "sh e2e/run-in-container.sh update",
     "prepublishOnly": "npm run build"
   },
   "repository": {
@@ -58,11 +60,14 @@
     "@eslint/js": "10.0.1",
     "@types/express": "5.0.6",
     "@types/node": "26.1.2",
+    "@types/pngjs": "6.0.5",
     "@types/yargs": "17.0.35",
     "eslint": "10.8.0",
     "eslint-config-prettier": "10.1.8",
     "globals": "17.8.0",
+    "pixelmatch": "7.2.0",
     "playwright-core": "1.62.0",
+    "pngjs": "7.0.0",
     "prettier": "3.9.6",
     "tsx": "4.23.1",
     "typescript": "6.0.3",

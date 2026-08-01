@@ -9,7 +9,7 @@
 - `detect-errors` is meant for CI pipelines; it scans the log for build-breaking problems and warnings and exits with error, helping you detect and solve hidden Renovate issues you would otherwise miss
 - `analyze` (with a corresponding SKILL.md) tells your coding agent (Codex, Copilot, Claude Code, etc.) about the log's structure, allowing it to efficiently read only the most relevant log lines in a token-efficient way, so that it can quickly (and cheaply) diagnose Renovate problems
 - `web` starts a temporary local web server that parses the log and serves a browser-based interface that you use to analyze and filter Renovate logs of _any_ length; this solves the problem of tedious, manual “grep”-like analyses where your text editor chokes on too large files
-- `install-analyze-skill` (run `npx renovate-log-parser install-analyze-skill`) writes that SKILL.md into your project or home directory, optionally including instructions for pulling the log straight from your GitHub Actions Renovate runs — so your agent knows both how to get a log and how to read it
+- `install-analyze-skill` writes a SKILL.md into your project or home directory, optionally including instructions for pulling the log straight from your GitHub Actions Renovate runs — so your agent knows both how to get a log and how to read it
 
 Want to try it right away? Grab an example log and open it in the web UI:
 
@@ -311,6 +311,9 @@ npm run test:e2e   # Packaging E2E tests (slow: builds, packs, installs)
 
 # One-off, needed by the browser tests inside the E2E suite:
 npx playwright-core install chromium
+
+npm run test:e2e:screenshots         # + pixel comparison, in Docker
+npm run test:e2e:screenshots:update  # rewrite the committed baselines
 ```
 
 Three suites, each catching a different failure class:
@@ -350,6 +353,42 @@ Three suites, each catching a different failure class:
   `npx playwright-core install chromium`; when a browser test fails, a
   screenshot, an HTML dump and the captured console/server output are written to
   `e2e-artifacts/` (CI uploads them as a build artifact).
+
+### Screenshot tests
+
+The last four cases in the `web UI` block compare the live UI against the PNGs
+committed under [`e2e/screenshots/`](./e2e/screenshots) — the empty state, a
+loaded log, the Problems slide-over and the details slide-over. **Any** differing
+pixel fails the test. Locator-based assertions cannot see a broken layout, a
+level glyph that lost its colour, or a Nuxt UI upgrade that reflows the header;
+this is the only suite that can.
+
+Pixels are decided by more than the code: the Chromium build, the installed font
+files and the fontconfig rasterisation settings all change the output. A baseline
+is therefore only meaningful against a frozen environment, so the comparison runs
+inside the container built from [`e2e/Dockerfile`](./e2e/Dockerfile) — pinned base
+image, Chromium pinned to the `playwright-core` version in `package.json`, and a
+fixed grayscale-antialiasing/hinting config. Outside that container the four
+cases skip themselves, so a plain `npm run test:e2e` keeps working as before.
+
+```bash
+npm run test:e2e:screenshots         # build the image, run the suite, compare
+npm run test:e2e:screenshots:update  # same, but rewrite the baselines
+```
+
+Both build the image (cached after the first run) and mount the work tree as your
+own UID, so nothing root-owned is left behind. On a mismatch the expected, actual
+and diff images are written to `e2e-artifacts/` and uploaded by CI.
+
+After an intended UI change, run the update script, **look at the regenerated
+PNGs**, and commit them alongside the change — a baseline diff is part of the
+review, not a chore to rubber-stamp. Upgrading `@nuxt/ui`, `tailwindcss` or
+`playwright-core` will usually require the same, since all three move pixels.
+
+For this to hold, `Public Sans` is self-hosted via `@fontsource/public-sans`
+rather than merely declared: an unloaded font falls back to whatever
+`sans-serif` the viewer's OS provides, which made the UI render differently on
+every machine.
 
 ### Regenerating the log fixtures
 

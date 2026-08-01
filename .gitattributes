@@ -1,0 +1,6 @@
+# Screenshot baselines for the browser E2E tests. Byte-exact comparison, so
+# they must never be touched by eol normalisation, and a textual diff of a PNG
+# is noise in review.
+*.png binary
+*.woff binary
+*.woff2 binary

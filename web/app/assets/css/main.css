@@ -1,6 +1,20 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/*
+ * Self-hosted so the UI actually renders in the font it declares below. Without
+ * these, `Public Sans` is never loaded and every visitor falls through to their
+ * own OS `sans-serif` — which also made screenshot baselines impossible, since
+ * the same markup rendered differently on every machine. Latin-only, and only
+ * the weights the UI uses (400/500/600/700 + 400 italic for the log rows), to
+ * keep the bundle small.
+ */
+@import "@fontsource/public-sans/latin-400.css";
+@import "@fontsource/public-sans/latin-400-italic.css";
+@import "@fontsource/public-sans/latin-500.css";
+@import "@fontsource/public-sans/latin-600.css";
+@import "@fontsource/public-sans/latin-700.css";
+
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
 
