@@ -564,6 +564,47 @@ describe("packaged CLI", { skip: process.env.SKIP_E2E === "1" }, () => {
       await p.locator(".log-row--highlight").waitFor();
     });
 
+    webTest("renders multiline string details as readable text", async (p) => {
+      await p.goto(logUrl());
+      await p.getByText(fixture, { exact: true }).waitFor();
+
+      const filteredRows = p.waitForResponse((response) => {
+        if (!response.url().includes("/api/rows")) return false;
+        const filters = new URL(response.url()).searchParams.get("filters");
+        return filters?.includes("lock file error") ?? false;
+      });
+      await p
+        .getByPlaceholder("Search msg (use * for wildcards)…")
+        .fill("lock file error");
+      await filteredRows;
+
+      const row = p
+        .getByTestId("log-row")
+        .filter({ has: p.getByText("lock file error", { exact: true }) })
+        .first();
+      await row.waitFor();
+      await row.click();
+
+      const stderr = p
+        .getByRole("dialog")
+        .locator('[data-testid="json-tree-value"][data-key-name="stderr"]')
+        .first();
+      await stderr.waitFor();
+      const rendered = await stderr.evaluate((element) => ({
+        text: element.textContent ?? "",
+        renderedLines: (element as HTMLElement).innerText.split("\n").length,
+        whiteSpace: getComputedStyle(element).whiteSpace,
+      }));
+
+      assert.match(rendered.text, /Unknown env config "store"/);
+      assert.doesNotMatch(rendered.text, /\\"store\\"/);
+      assert.ok(
+        rendered.renderedLines > 10,
+        "stderr was not rendered on multiple lines",
+      );
+      assert.equal(rendered.whiteSpace, "pre-wrap");
+    });
+
     /*
      * Pixel comparison against the committed baselines in e2e/screenshots/.
      *

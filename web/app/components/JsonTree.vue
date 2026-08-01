@@ -105,10 +105,15 @@ const summary = computed(() => {
   return ''
 })
 
-/** Human display of a leaf value (strings quoted, others stringified). */
+/** Multiline strings are shown as readable output rather than JSON syntax. */
+const isMultilineString = computed(
+  () => typeof props.value === 'string' && /[\r\n]/.test(props.value)
+)
+
+/** Human display of a leaf value (single-line strings quoted, others readable). */
 function primitiveDisplay(v: unknown): string {
   if (kind.value === 'null') return 'null'
-  if (typeof v === 'string') return JSON.stringify(v)
+  if (typeof v === 'string') return isMultilineString.value ? v : JSON.stringify(v)
   return String(v)
 }
 
@@ -269,7 +274,9 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
         >{{ summary }}</span>
         <span
           v-else
-          :class="primitiveClass"
+          data-testid="json-tree-value"
+          :data-key-name="keyName"
+          :class="[primitiveClass, isMultilineString ? 'whitespace-pre-wrap' : '']"
         >{{ primitiveDisplay(value) }}</span>
       </div>
     </UContextMenu>
