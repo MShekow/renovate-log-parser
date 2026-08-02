@@ -1,6 +1,8 @@
 # renovate-log-parser
 
-![](./renovate-log-parser.webp)
+<p align="center"><img src="./renovate-log-parser.webp" width="400" /></p>
+
+https://github.com/user-attachments/assets/141eddd0-1a4f-4b70-b09c-c10e6dca10ee
 
 `renovate-log-parser` is a CLI and web interface for manual and automated analyses of Renovate Bot debug logs (JSONL-formatted), which you get by either downloading a run's log from [https://developer.mend.io](https://developer.mend.io) (if you use Mend's _hosted_ GitHub app), or by setting the `LOG_FILE` environment variable for self-hosted Renovate.
 
