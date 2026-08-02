@@ -8,7 +8,7 @@ https://github.com/user-attachments/assets/141eddd0-1a4f-4b70-b09c-c10e6dca10ee
 
 `renovate-log-parser` offers the following commands:
 
-- `detect-errors` is meant for CI pipelines; it scans the log for build-breaking problems and warnings and exits with error, helping you detect and solve hidden Renovate issues you would otherwise miss
+- `detect-errors` is meant for CI pipelines; it scans the log for potential problems and warnings and exits with error, helping you detect and solve hidden Renovate issues you would otherwise miss
 - `analyze` (with a corresponding SKILL.md) tells your coding agent (Codex, Copilot, Claude Code, etc.) about the log's structure, allowing it to efficiently read only the most relevant log lines in a token-efficient way, so that it can quickly (and cheaply) diagnose Renovate problems
 - `web` starts a temporary local web server that parses the log and serves a browser-based interface that you use to analyze and filter Renovate logs of _any_ length; this solves the problem of tedious, manual “grep”-like analyses where your text editor chokes on too large files
 - `install-analyze-skill` writes a SKILL.md into your project or home directory, optionally including instructions for pulling the log straight from your GitHub Actions Renovate runs — so your agent knows both how to get a log and how to read it
@@ -53,7 +53,7 @@ Consequently, a tool was needed that detects such subtle problems automatically,
 Run directly with `npx` (no install required):
 
 ```bash
-# Detect build-breaking problems in a Renovate JSONL log (CI-friendly)
+# Detect potential problems in a Renovate JSONL log (CI-friendly)
 npx renovate-log-parser detect-errors path/to/renovate.jsonl
 
 # Also write a machine-readable JSON report
@@ -77,7 +77,7 @@ renovate-log-parser --help
 
 ### `detect-errors <path>`
 
-Deterministically scans a Renovate debug log (JSONL) for build-breaking
+Deterministically scans a Renovate debug log (JSONL) for potential
 problems and warnings — designed to gate CI. It prints a human-readable summary
 to stdout and, with `--out`, writes a stable machine-readable JSON report.
 
