@@ -1,0 +1,85 @@
+# Creates regular patch releases (when NPM the dependency graph moved) to signal on NPM that this
+# project is still maintained.
+#
+# This workflow only pushes a tag. `cd.yml` triggers on `push: tags: ["v*"]`
+# and does the npm publishing. Nothing is published from here.
+name: Automatic release
+
+on:
+  schedule:
+    # 1st and 15th of each month, 04:00 UTC - roughly every two weeks. Cron has
+    # no native "every 2 weeks", so the gap is 14-17 days depending on month.
+    - cron: "0 4 1,15 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: automatic-release
+  cancel-in-progress: false
+
+# The tag is pushed with a PAT (see below), not with GITHUB_TOKEN, so this
+# workflow itself never needs write access.
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Tag a patch release
+    runs-on: ubuntu-latest
+    steps:
+      # Full history and all tags: the check below diffs against the last tag,
+      # and github-tag-action walks the log between that tag and HEAD.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Check for dependency changes since the last version tag
+        id: deps
+        run: |
+          set -euo pipefail
+
+          # Same tag shape that cd.yml and github-tag-action accept. The
+          # `|| true` absorbs grep's no-match exit status under `pipefail`.
+          last_tag="$(git tag --list 'v*' --sort=-v:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | head -n 1 || true)"
+
+          if [ -z "$last_tag" ]; then
+            # Without a baseline there is nothing to compare against, and the
+            # first release should be a deliberate, manual one.
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No release: the repository has no \`v*\` tag to compare against. Tag the first release manually." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # `:(glob)**/<file>` matches the file at the repository root as well
+          # as in every workspace (currently `web/package.json`).
+          changed="$(git diff --name-only "$last_tag..HEAD" -- \
+            ':(glob)**/package.json' \
+            ':(glob)**/package-lock.json')"
+
+          if [ -n "$changed" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "Releasing: dependency files changed since \`$last_tag\`:"
+              echo
+              echo '```'
+              echo "$changed"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No release: no \`package.json\` or \`package-lock.json\` changed since \`$last_tag\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Bump version and push tag
+        if: steps.deps.outputs.changed == 'true'
+        uses: anothrNick/github-tag-action@4ed44965e0db8dab2b466a16da04aec3cc312fd8 # 1.75.0
+        env:
+          # Note: we use a custom PAT, because secrets.GITHUB_TOKEN has a limitation that tags pushed with it
+          # would NOT trigger workflows that are configured for "on -> push -> tags")
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          TAG_PREFIX: v
+          DEFAULT_BUMP: "patch"
+          # Safe, because the step above is the actual gate: it only lets the
+          # run reach this point when dependency files really did change.
+          FORCE_WITHOUT_CHANGES: true
