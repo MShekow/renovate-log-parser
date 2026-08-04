@@ -4,16 +4,18 @@
 
 https://github.com/user-attachments/assets/38381841-c6fd-4d05-b4cf-6a897bef3c6b
 
-`renovate-log-parser` is a CLI and web interface for manual and automated analyses of Renovate Bot debug logs (JSONL-formatted), which you get by either downloading a run's log from [https://developer.mend.io](https://developer.mend.io) (if you use Mend's _hosted_ GitHub app), or by setting the `LOG_FILE` environment variable for self-hosted Renovate.
+`renovate-log-parser` is a CLI and web interface for manual and automated analysis of Renovate Bot debug logs in JSONL format.
+
+To get this log: if you use the _hosted_ Mend GitHub app, download a run log from [https://developer.mend.io](https://developer.mend.io). For self-hosted Renovate, set the `LOG_FILE` environment variable.
 
 `renovate-log-parser` offers the following commands:
 
-- `detect-errors` is meant for CI pipelines; it scans the log for potential problems and warnings and exits with error, helping you detect and solve hidden Renovate issues you would otherwise miss
-- `analyze` (with a corresponding SKILL.md) tells your coding agent (Codex, Copilot, Claude Code, etc.) about the log's structure, allowing it to efficiently read only the most relevant log lines in a token-efficient way, so that it can quickly (and cheaply) diagnose Renovate problems
-- `web` starts a temporary local web server that parses the log and serves a browser-based interface that you use to analyze and filter Renovate logs of _any_ length; this solves the problem of tedious, manual “grep”-like analyses where your text editor chokes on too large files
-- `install-analyze-skill` writes a SKILL.md into your project or home directory, optionally including instructions for pulling the log straight from your GitHub Actions Renovate runs — so your agent knows both how to get a log and how to read it
+- `detect-errors` scans the log for potential problems and warnings. If it finds a problem, it exits with an error and reports the cause. This solves hidden Renovate issues you would otherwise miss.
+- `analyze` reports the log structure. A SKILL.md teaches coding agents to read relevant lines and diagnose Renovate problems with fewer tokens.
+- `web` starts a temporary local web server. The server parses logs of _any_ length and provides an interface for analysis and filtering. This interface replaces manual “grep”-like analysis that can overwhelm a text editor.
+- `install-analyze-skill` writes a SKILL.md to your project or home directory. It can include instructions to get logs from self-hosted Renovate runs in GitHub Actions. Your agent then knows how to get and read a log.
 
-Want to try it right away? Grab an example log and open it in the web UI:
+To try it now, download an example log and open it in the web UI:
 
 ```bash
 curl -sSLO https://raw.githubusercontent.com/MShekow/renovate-log-parser/main/src/core/__tests__/fixtures/various-issues.jsonl
@@ -21,7 +23,7 @@ npx renovate-log-parser web various-issues.jsonl
 ```
 
 <details>
-<summary>Or, if you prefer Docker (mounting the log into the container and mapping the port)</summary>
+<summary>Or use Docker to mount the log in the container and map the port</summary>
 
 ```bash
 curl -sSLO https://raw.githubusercontent.com/MShekow/renovate-log-parser/main/src/core/__tests__/fixtures/various-issues.jsonl
@@ -29,28 +31,28 @@ docker run --rm -it -p 3000:3000 -v "$PWD/various-issues.jsonl:/logs/various-iss
   npx -y renovate-log-parser web /logs/various-issues.jsonl --host 0.0.0.0 --no-open
 ```
 
-Once the container reports that the server is listening, open the UI from a
-second terminal — the `?log=` parameter is the path _inside_ the container, and
-makes the UI load the file right away (`open` instead of `xdg-open` on macOS):
+When the container reports that the server is listening, open the UI from a second terminal:
 
 ```bash
 xdg-open "http://localhost:3000/?log=/logs/various-issues.jsonl"
 ```
 
+The `?log=` parameter contains the path _inside_ the container. This parameter makes the UI load the file immediately. On macOS, use `open` instead of `xdg-open`:
+
 </details>
 
-## Background (why do I need this)
+## Background (why you need this)
 
-This tool was born out of the need to solve various problems, such as:
+This tool solves these problems:
 
-- Setting up Renovate in a project with many repositories (and development teams) is easy. But over time, subtle problems creep in that no one seems to notice. For instance, Renovate might stop creating PRs for intricate reasons, and it only posts a small notice-block about this problem to the _Dependency dashboard_ GitHub issue. Unfortunately, the development teams use _Jira_ for issues and never look at GitHub issues, so the problems remain unnoticed.
-- In practice, developers sometimes have problems with Renovate Bot. They wonder why Renovate does not do certain things (even though they think it should), or they are annoyed that Renovate does certain things they don't want it to do. Manual analysis (given the huge debug-level log) is very difficult for non-experts, as important information is often buried in _debug_\-level log lines rather than warning- or error-level log lines. And AI agents miss important information in large log files, or spend enormous amounts of tokens for the analysis. As a consequence, people tend to accept a sub-optimal Renovate configuration or become frustrated with Renovate in general.
+- Renovate is easy to configure for projects with many repositories and development teams. However, subtle problems can occur later without notice. For example, Renovate can stop creating PRs for complex reasons. It only adds a small notice block to the _Dependency dashboard_ GitHub issue. Teams that use _Jira_ can miss this notice because they do not read GitHub issues.
+- Developers do not always understand the actions of Renovate Bot. Renovate can omit expected actions or do unwanted actions. Manual analysis is difficult for non-experts because the debug-level log is overly verbose. Important information often occurs in _debug_\-level lines, not warning- or error-level lines. AI agents can miss information in large logs or use many tokens for analysis. Consequently, users accept a suboptimal Renovate configuration or become frustrated with Renovate.
 
-Consequently, a tool was needed that detects such subtle problems automatically, and that simplifies manual and AI-assisted analyses of Renovate log files.
+This tool automatically detects these subtle problems. It also makes manual and AI-assisted analysis of Renovate log files simpler.
 
 ## Usage
 
-Run directly with `npx` (no install required):
+Run the tool directly with `npx`. You do not have to install it:
 
 ```bash
 # Detect potential problems in a Renovate JSONL log (CI-friendly)
@@ -66,7 +68,7 @@ npx renovate-log-parser analyze path/to/renovate.jsonl
 npx renovate-log-parser web path/to/renovate.jsonl
 ```
 
-Or install globally:
+Alternatively, install the tool globally:
 
 ```bash
 npm install -g renovate-log-parser
@@ -77,47 +79,48 @@ renovate-log-parser --help
 
 ### `detect-errors <path>`
 
-Deterministically scans a Renovate debug log (JSONL) for potential
-problems and warnings — designed to gate CI. It prints a human-readable summary
-to stdout and, with `--out`, writes a stable machine-readable JSON report.
+This command scans a Renovate debug log (JSONL) for potential problems and warnings. It uses deterministic rules to gate CI.
+
+The command prints a readable summary to stdout. With `--out`, it writes a stable JSON report for machine processing. It can be used for comparisons between CI runs.
 
 ```bash
 renovate-log-parser detect-errors renovate.jsonl [--out report.json] \
   [--ignore-file rules.json] [--fail-on-warn]
 ```
 
-| Arg / option     | Default                             | Description                                       |
-| ---------------- | ----------------------------------- | ------------------------------------------------- |
-| `<path>`         | **required**                        | Path to the Renovate JSONL log                    |
-| `--out`          | (none)                              | Also write the machine-readable JSON report here  |
-| `--ignore-file`  | `./renovate-log-parser.ignore.json` | Ignore-rules file (a missing file means no rules) |
-| `--fail-on-warn` | `false`                             | Make warning findings affect the exit code        |
+| Arg / option     | Default                             | Description                                 |
+| ---------------- | ----------------------------------- | ------------------------------------------- |
+| `<path>`         | **required**                        | Path to the Renovate JSONL log              |
+| `--out`          | (none)                              | Path to the machine-readable JSON report    |
+| `--ignore-file`  | `./renovate-log-parser.ignore.json` | Ignore file (a missing file means no rules) |
+| `--fail-on-warn` | `false`                             | Include warning findings in the exit code   |
 
 **Exit codes:**
 
 - `0` = no non-ignored errors
-- `1` = ≥1 non-ignored error (or, with `--fail-on-warn`, ≥1 non-ignored warning)
+- `1` = ≥1 non-ignored error (or ≥1 non-ignored warning with `--fail-on-warn`)
 - `2` = tool/usage error (bad path, unreadable, bad args, malformed ignore file)
 
 **Detected categories**:
 
-- **Errors** (things Renovate would _not_ otherwise flag in a PR comment):
-  - `host-error-abort`: when Renovate skipped creating/updating PRs for a repository because one or more well-known registries were unreachable; looks for a `Repository finished` entry with `result: "external-host-error"`
+- **Errors** (conditions that Renovate does _not_ otherwise flag in a PR comment):
+  - `host-error-abort`: Renovate skipped PR creation or updates because it was unable to reach one or more well-known registries. The detector looks for a `Repository finished` entry with `result: "external-host-error"`.
   - `log-error`: lines with error level (level=50)
   - `log-fatal`: lines with fatal level (level=60)
-  - `config-migration`: when a repository needs a renovate.json migration; looks for a `Config migration necessary` entry carrying `oldConfig` + `newConfig`
-  - `abandoned-package`: when a repository contains one or more abandoned packages for which Renovate would not create a PR; reports one finding per package in an `Abandoned package statistics` entry
+  - `config-migration`: a repository needs a renovate.json migration. The detector looks for a `Config migration necessary` entry that contains `oldConfig` + `newConfig`.
+  - `abandoned-package`: a repository contains one or more abandoned packages for which Renovate does not create a PR. The detector reports one finding per package in an `Abandoned package statistics` entry.
 - **Warnings**:
   - `log-warn`: lines with warning level (level=40)
   - `err-object`: reports lines with an `err` object, such as rawExec errors
-  - `repo-problem`: reports entries in `repoProblems` lines (which is a string-array)
+  - `repo-problem`: reports entries in `repoProblems` lines, which contain a string array
 
-The JSON report's `counts` map always lists every category (zeros included) for stable run-over-run diffing in CI.
+The `counts` map in the JSON report always lists every category, including zero counts. This structure keeps comparisons between CI runs stable.
 
-**Ignore file** — silence expected findings with stable keys (line numbers shift
-as logs grow). A finding is ignored iff an active rule matches on `category` AND
-(optional `message` glob) AND (optional exact `repository`). Rules past their
-optional `expires` date are reported to stderr and skipped:
+**Ignore file**: Use stable keys to hide expected findings because line numbers change as logs grow.
+
+An active rule must match `category`. If it contains `message` or `repository`, these values must also match.
+
+If a rule is past its optional `expires` date, the tool reports it to stderr and skips it:
 
 ```jsonc
 {
@@ -134,16 +137,16 @@ optional `expires` date are reported to stderr and skipped:
 }
 ```
 
-Ignored findings still appear in the report with `"ignored": true`, but are
-excluded from the summary counts and the exit code.
+Ignored findings remain in the report with `"ignored": true`. The summary counts and exit code exclude them.
 
 ### `analyze <path>`
 
-Emits token-efficient structure for an AI coding agent (or a human). Without
-`--print` it writes compact single-line JSON whole-log **stats** to stdout; with `--print` it
-streams a filtered, line-ranged, limited **JSONL** slice of the log (one entry
-per line). The intended loop is: read the stats, pick the interesting line
-range, then `--print` just that range — reading only what you need.
+This command provides a token-efficient structure for an AI coding agent or a person.
+
+Without `--print`, it writes compact, single-line JSON **stats** for the complete log to stdout. With `--print`, it streams a filtered, line-ranged, and limited **JSONL** section. Each entry uses one line.
+
+The intended loop is:
+First, read the statistics. Then select the relevant line range. Use `--print` to read only that range.
 
 ```bash
 # Whole-log stats: level counts + per-repository structure
@@ -169,44 +172,43 @@ renovate-log-parser analyze renovate.jsonl --print \
 | `--filter-with-wildcard`    | (none)                                | `key:pattern` wildcard filter (`*` = any run), case-insensitive, repeatable, AND'd |
 | `--include-original-line`   | `false`                               | Add `_oL` (0-indexed source line) to each object                                   |
 
-**Stats mode** reports `levelCounts` (entries per numeric level) and a `repos`
-array — each repository's line span, unique branches, the rowids of its
-`branches info extended` and `packageFiles with updates` entries, its
-`repoProblems`, and its dependency inventory (`depNames`/`packageNames`, unioning
-root-level keys with the `packageFiles with updates` config).
+**Stats mode** reports `levelCounts`, which contains the entry count for each numeric level. It also reports a `repos` array.
 
-**Print mode** selects rows in order line-range -> filters -> `--limit` (first N
-by line order). Output is JSONL on stdout with the ignored root fields stripped
-(`msg` is never stripped); when the limit caps the result, a truncation notice is
-written to **stderr** so stdout stays a clean, pipeable stream.
+For each repository, this array contains the line range, unique branches, and rowids of `branches info extended` entries. It also contains rowids of `packageFiles with updates` entries, `repoProblems`, and the dependency inventory. This inventory combines root-level `depNames`/`packageNames` keys with the `packageFiles with updates` configuration.
 
-Both filter flags target a single root-level key and can be repeated (all
-conditions are AND'd, alongside any line range). `--filter` matches the value
-**exactly**; its value is auto-typed so it compares against the correctly-typed
-JSON — `true`/`false` become booleans and plain numbers become numbers (so
-`level:30` matches the numeric `level`), while everything else (including
-leading-zero or dotted values like `007` / `1.2.3`) stays a string.
-`--filter-with-wildcard` treats `*` as "any run of characters" (nothing else is
-special — `?` and `%` are literal) and matches case-insensitively. A pattern is
-anchored as written, so use a leading/trailing `*` for prefix/suffix/contains
-matching (e.g. `msg:*lock file*`).
+**Print mode** selects rows in this order: line range, filters, then `--limit`. The limit selects the first N rows in line order.
 
-**Exit codes:** `0` = success · `2` = tool/usage error (bad path, unreadable, bad
-filter token).
+The output is JSONL on stdout without the ignored root fields. The command never removes `msg`.
+
+When the limit restricts the result, the command writes a truncation notice to **stderr**. Therefore, stdout remains a clean stream for pipes.
+
+Both filter flags target one root-level key. You can repeat them, and all conditions use AND logic with the line range.
+
+`--filter` matches the value **exactly**. The command converts its value to a typed JSON value for comparison.
+
+The values `true` and `false` become Boolean values. Plain numbers become numbers, so `level:30` matches the numeric `level`.
+
+All other values remain strings. This rule includes values with leading zeros or dots, such as `007` or `1.2.3`.
+
+`--filter-with-wildcard` treats `*` as "any run of characters" and uses a case-insensitive match. The characters `?` and `%` remain literal.
+
+The command anchors the pattern as written. Use a leading or trailing `*` for prefix, suffix, or contains matches. For example, use `msg:*lock file*`.
+
+**Exit codes:** `0` = success · `2` = tool/usage error (bad path, unreadable, bad filter token).
 
 ### `install-analyze-skill`
 
-Writes (or updates) a `renovate-log-analyzer` **SKILL.md** that teaches an AI
-coding agent (Codex, Copilot, Claude Code, …) how to drive the `analyze` command
-token-efficiently. It can optionally embed instructions for fetching the
-log from GitHub self-hosted Renovate workflows via the `gh` CLI.
+This command writes or updates a `renovate-log-analyzer` **SKILL.md**. The skill teaches an AI coding agent how to use `analyze` with fewer tokens.
 
-The command is interactive by default: it asks whether to install the skill
-**locally** or **globally**, and whether to include the GitHub-fetch section —
-which assumes you run self-hosted Renovate as a GitHub Actions workflow in a
-repository (and if so, the repository as `org/repo`, the Renovate workflow
-filename, and the base URL). All answers can also be supplied as flags to run
-non-interactively (e.g. in CI); any flag you pass skips its prompt.
+The agent can be Codex, Copilot, Claude Code, or another coding agent. The skill can include instructions to get logs from self-hosted Renovate workflows in GitHub Actions with the `gh` CLI.
+
+By default, the command is interactive. It asks whether to install the skill **locally** or **globally**.
+
+It also asks whether to include the GitHub fetch section. This section applies to self-hosted Renovate in a GitHub Actions workflow.
+
+If you include this section, provide the repository as `org/repo`, the Renovate workflow filename, and the base URL.
+
+Provide all answers as flags to run without prompts. Use these flags in CI. Each provided flag skips its prompt.
 
 ```bash
 # Interactive
@@ -218,31 +220,26 @@ npx renovate-log-parser install-analyze-skill --scope local --with-gh \
   --gh-repo acme/app --gh-workflow renovate.yml
 ```
 
-The skill is written to
-`<root>/.agents/skills/renovate-log-analyzer/SKILL.md`, where `<root>` is the
-current working directory (`local`) or your home directory (`global`).
+The command writes the skill to `<root>/.agents/skills/renovate-log-analyzer/SKILL.md`. The `<root>` is the current working directory for `local` scope. It is your home directory for `global` scope.
 
-| Arg / option    | Default        | Description                                                            |
-| --------------- | -------------- | ---------------------------------------------------------------------- |
-| `--scope`       | (prompt)       | `local` (`<cwd>/.agents/skills`) or `global` (`~/.agents/skills`)      |
-| `--with-gh`     | (prompt)       | Include a "fetch logs from GitHub via `gh`" section                    |
-| `--gh-base-url` | (prompt if gh) | GitHub Enterprise host (e.g. `github.example.com`); blank = github.com |
-| `--gh-repo`     | (prompt if gh) | Repository as `org/repo` (e.g. `acme/app`)                             |
-| `--gh-workflow` | (prompt if gh) | Filename of the workflow that runs Renovate (e.g. `renovate.yml`)      |
-| `--yes`         | `false`        | Skip all prompts; fail if a required answer is missing                 |
+| Arg / option    | Default        | Description                                                                    |
+| --------------- | -------------- | ------------------------------------------------------------------------------ |
+| `--scope`       | (prompt)       | `local` (`<cwd>/.agents/skills`) or `global` (`~/.agents/skills`)              |
+| `--with-gh`     | (prompt)       | Include a "fetch logs from GitHub via `gh`" section                            |
+| `--gh-base-url` | (prompt if gh) | GitHub Enterprise host (for example, `github.example.com`). Blank = github.com |
+| `--gh-repo`     | (prompt if gh) | Repository as `org/repo` (for example, `acme/app`)                             |
+| `--gh-workflow` | (prompt if gh) | Filename of the workflow that runs Renovate (for example, `renovate.yml`)      |
+| `--yes`         | `false`        | Skip all prompts. Fail if a required answer is missing                         |
 
-**Exit codes:** `0` = success · `2` = tool/usage error (missing required answer
-when non-interactive, or a write failure).
+**Exit codes:** `0` = success · `2` = tool/usage error (missing required answer without prompts, or a write failure).
 
 ### `web`
 
-Starts the bundled web UI for interactive, filtered log exploration: a
-statically-rendered [Nuxt](https://nuxt.com) SPA (with
-[Nuxt UI](https://ui.nuxt.com)) served by a small
-[Express](https://expressjs.com) server that also exposes the `/api` endpoints.
-Pass an optional log path to open it automatically; otherwise use the in-app file
-picker. The server keeps the parsed log in memory (SQLite-backed) and streams
-paged rows to the client.
+This command starts the bundled web UI for interactive, filtered log analysis. The UI is a statically rendered [Nuxt](https://nuxt.com) SPA with [Nuxt UI](https://ui.nuxt.com).
+
+A small [Express](https://expressjs.com) server provides the UI and exposes the `/api` endpoints. The server keeps the SQLite-backed parsed log on disk. It streams paged rows to the client.
+
+To open a log automatically, provide its optional path. Otherwise, use the file picker in the UI.
 
 | Arg / option | Default     | Description                                        |
 | ------------ | ----------- | -------------------------------------------------- |
@@ -259,35 +256,25 @@ renovate-log-parser web path/to/renovate.jsonl
 renovate-log-parser web --port 4000 --no-open
 ```
 
-**The viewer** renders every log line in a virtualized, fixed-height list — a
-colored level glyph (`T/D/I/W/E/F`) plus the entry's `msg`.
-Clicking a row's arrow opens a details slide-over with a recursive,
-collapsible JSON tree of the full entry.
+**The viewer** displays every log line in a virtualized list with a fixed height. Each row shows a colored level glyph (`T/D/I/W/E/F`) and the entry `msg`.
 
-**Filtering** (all AND'd, debounced):
+The arrow in each row opens the details slide-over. The slide-over contains a recursive, collapsible JSON tree of the complete entry.
 
-- **Log levels** — a dropdown to show/hide entries by level.
-- **Repositories** — include/exclude by repository, plus a
-  "Repository-independent" pseudo-group for entries with no `repository`.
-- **Ignored fields** — hide noisy root keys from the row list (`msg` is always
-  kept).
-- **Free-text search** — a field selector whose first entry, **Raw search**,
-  matches the whole line (any key or value); any other field does a
-  case-insensitive `*`-wildcard match scoped to that field.
-- **Pills** — dynamic, individually toggleable/removable filters created from row
-  and JSON-tree context menus (e.g. show-only/hide a `field`, or a
-  `field == value`; nested keys create a scoped "contains" search on their
-  top-level ancestor).
+**Filtering**: The UI combines all filters with AND logic and debounces input.
 
-The affordances that cannot be discovered by looking — the two context menus
-above all, but also the pill click/✕ semantics, the `*` search rules and what
-"Hidden fields" actually does — are documented in the UI itself, behind the
-**Help** button in the header.
+- **Log levels**: a dropdown that shows or hides entries by level.
+- **Repositories**: includes or excludes entries by repository. The "Repository-independent" pseudo-group contains entries without a `repository`.
+- **Ignored fields**: hides noisy root keys from the row list. The UI always keeps `msg`.
+- **Free-text search**: a field selector. Its first entry, **Raw search**, matches any key or value in the complete line. Other fields use a case-insensitive `*` wildcard match in that field.
+- **Pills**: dynamic filters from the context menus for rows and JSON trees. You can enable, disable, or remove each filter. For example, show or hide a `field` or a `field == value`. Nested keys create a scoped "contains" search for their top-level ancestor.
+
+The UI help explains controls that are not visually apparent. These controls include context menus, pill behavior, search rules, and hidden fields.
+
+Select the **Help** button in the header to read this information.
 
 ## Development
 
-This repository is an npm workspace: the publishable CLI and the Express web
-server live at the root (`src/`), the Nuxt frontend lives in [`web/`](./web).
+This repository is an npm workspace. The publishable CLI and Express web server are in the root `src/` directory. The Nuxt frontend is in [`web/`](./web).
 
 ```bash
 # Install all workspace dependencies
@@ -323,87 +310,63 @@ npm run test:e2e:screenshots         # + pixel comparison, in Docker
 npm run test:e2e:screenshots:update  # rewrite the committed baselines
 ```
 
-Three suites, each catching a different failure class:
+Three suites detect different failure classes:
 
-- **Unit tests** (`src/core/__tests__/*.test.ts`) — synthetic, hand-written
-  JSONL logs asserting the detection contracts in isolation.
-- **Fixture tests** (`src/core/__tests__/fixtures.test.ts`) — the full
-  Parser → ErrorDetector/Analyzer pipeline run over _real_ Renovate logs
-  captured against
-  [`MShekow/renovate-log-parser-test`](https://github.com/MShekow/renovate-log-parser-test)
-  and committed under `src/core/__tests__/fixtures/`:
+- **Unit tests** (`src/core/__tests__/*.test.ts`): These tests use synthetic, manually written JSONL logs. Each log tests one detection contract.
+- **Fixture tests** (`src/core/__tests__/fixtures.test.ts`): The complete Parser → ErrorDetector/Analyzer pipeline runs on _real_ Renovate logs. These logs come from [`MShekow/renovate-log-parser-test`](https://github.com/MShekow/renovate-log-parser-test). The repository stores them in `src/core/__tests__/fixtures/`:
 
   | Fixture                       | What it demonstrates                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | `external-host-error.jsonl`   | NPM registry blocked → the run aborts with `result: "external-host-error"`                                                                                           |
-  | `various-issues.jsonl`        | Abandoned packages, a required config migration, and an npm `lock file error` whose `err.stderr` reports a `Conflicting peer dependency`                             |
+  | `various-issues.jsonl`        | Abandoned packages, a required configuration migration, and an npm `lock file error` whose `err.stderr` reports a `Conflicting peer dependency`                      |
   | `failed-dotnet-install.jsonl` | `builds.dotnet.microsoft.com` blocked → `Datasource connection error` (`DEPTH_ZERO_SELF_SIGNED_CERT`) and `Failed to generate lock file` / "No tool releases found." |
 
-  The assertions are deliberately _semantic_ rather than snapshot-based, since a
-  Renovate log is full of volatile data (timestamps, pid, hostname, logContext,
-  dependency versions). They assert only the signals each scenario was captured
-  to demonstrate.
+  The assertions are _semantic_, not snapshot-based. A Renovate log contains variable data, such as timestamps, pid, hostname, logContext, and dependency versions. The assertions cover only the signals that each scenario demonstrates.
 
-- **Packaging E2E tests** (`e2e/pack-install.e2e.ts`) — build, `npm pack`,
-  install the tarball into an empty throwaway project, then drive the installed
-  `renovate-log-parser` binary against a fixture. This is the only suite that
-  can catch a missing `package.json#files` entry or a `dist/` import that only
-  resolved because `src/` sat next to it.
-  Set `SKIP_E2E=1` to skip.
+- **Packaging E2E tests** (`e2e/pack-install.e2e.ts`): These tests build and run `npm pack`. They install the tarball in an empty temporary project. Then they run the installed `renovate-log-parser` binary with a fixture. Only this suite detects a missing `package.json#files` entry. When `src/` is adjacent, it also detects a `dist/` import that resolves only in that location.
 
-  Its nested `web UI` block starts the installed `web` command and drives the
-  real UI in a headless Chromium, using the `playwright-core` _library_ — there
-  is no second test runner or config file, these are plain `node:test` cases in
-  the same file. Because they run against the installed tarball, they assert
-  that the shipped server actually boots and serves the SPA, not merely that its
-  files are present. Chromium must be installed once with
-  `npx playwright-core install chromium`; when a browser test fails, a
-  screenshot, an HTML dump and the captured console/server output are written to
-  `e2e-artifacts/` (CI uploads them as a build artifact).
+  To skip the packaging tests, set `SKIP_E2E=1`.
+
+  The nested `web UI` block starts the installed `web` command. It controls the real UI in headless Chromium with the `playwright-core` _library_. There is no second test runner or configuration file. The cases use `node:test` in the same file. The cases prove that the shipped server starts and provides the SPA. They do not only inspect the package files.
+
+  If a browser test fails, the suite writes a screenshot and HTML dump to `e2e-artifacts/`. It also writes the captured console and server output. CI uploads these files as a build artifact.
 
 ### Screenshot tests
 
-The last four cases in the `web UI` block compare the live UI against the PNGs
-committed under [`e2e/screenshots/`](./e2e/screenshots) — the empty state, a
-loaded log, the Problems slide-over and the details slide-over. **Any** differing
-pixel fails the test. Locator-based assertions cannot see a broken layout, a
-level glyph that lost its colour, or a Nuxt UI upgrade that reflows the header;
-this is the only suite that can.
+There are cases in the `web UI` block comparing the live UI with PNG files in [`e2e/screenshots/`](./e2e/screenshots). These files show the empty state, a loaded log, the Problems slide-over, and the details slide-over.
 
-Pixels are decided by more than the code: the Chromium build, the installed font
-files and the fontconfig rasterisation settings all change the output. A baseline
-is therefore only meaningful against a frozen environment, so the comparison runs
-inside the container built from [`e2e/Dockerfile`](./e2e/Dockerfile) — pinned base
-image, Chromium pinned to the `playwright-core` version in `package.json`, and a
-fixed grayscale-antialiasing/hinting config. Outside that container the four
-cases skip themselves, so a plain `npm run test:e2e` keeps working as before.
+A difference in **one** pixel fails the test. Locator-based assertions cannot detect a broken layout or a level glyph that lost its color. They also cannot detect a Nuxt UI upgrade that changes the header layout. Only this suite detects these changes.
+
+Code is not the only factor that changes pixels. The Chromium build, installed font files, and fontconfig rasterization configuration also change the output.
+
+A baseline is meaningful only in a fixed environment. Therefore, the comparison runs in the container built from [`e2e/Dockerfile`](./e2e/Dockerfile). The container has a pinned base image and a fixed grayscale antialiasing and hinting configuration. The `playwright-core` version in `package.json` pins the Chromium build.
+
+Outside this container, the four cases skip. Therefore, `npm run test:e2e` continues to work as before.
 
 ```bash
 npm run test:e2e:screenshots         # build the image, run the suite, compare
 npm run test:e2e:screenshots:update  # same, but rewrite the baselines
 ```
 
-Both build the image (cached after the first run) and mount the work tree as your
-own UID, so nothing root-owned is left behind. On a mismatch the expected, actual
-and diff images are written to `e2e-artifacts/` and uploaded by CI.
+Both commands build the image, which is cached after the first run. They mount the work tree with your UID. Therefore, they do not leave root-owned files on the host.
 
-After an intended UI change, run the update script, **look at the regenerated
-PNGs**, and commit them alongside the change — a baseline diff is part of the
-review, not a chore to rubber-stamp. Upgrading `@nuxt/ui`, `tailwindcss` or
-`playwright-core` will usually require the same, since all three move pixels.
+If the images differ, the commands write the expected, actual, and difference images to `e2e-artifacts/`. CI uploads these images.
 
-For this to hold, `Public Sans` is self-hosted via `@fontsource/public-sans`
-rather than merely declared: an unloaded font falls back to whatever
-`sans-serif` the viewer's OS provides, which made the UI render differently on
-every machine.
+After an intentional UI change, run the update script. Then **inspect the regenerated PNGs**. Commit them with the change.
+
+A baseline difference is part of the review. Do not approve it without inspection.
+
+After an upgrade of `@nuxt/ui`, `tailwindcss`, or `playwright-core`, update and inspect the screenshot baselines. All three products may change pixels.
+
+For consistent output, the project hosts `Public Sans` with `@fontsource/public-sans` instead of only declaring the font.
 
 ### Regenerating the log fixtures
 
-The [`compose.yml`](./compose.yml) stack runs Renovate against the test
-repository, with an NGINX "firewall" that Docker DNS points selected hostnames
-at, so outbound access to them fails exactly as it would behind a corporate
-proxy. The base file blocks nothing; each scenario layers on an override that
-adds the hostnames it needs to block:
+The [`compose.yml`](./compose.yml) stack runs Renovate against the test repository. It includes an NGINX "firewall" for selected hostnames.
+
+Docker DNS points these hostnames to the firewall. Therefore, outbound access to these hostnames fails as it does behind a corporate proxy.
+
+The base file does not block a hostname. Each scenario adds an override with the hostnames that it must block:
 
 ```bash
 # Requires a .env with GITHUB_PAT (+ optionally LOCAL_UID / LOCAL_GID)
@@ -416,23 +379,23 @@ cp container-out-logs/out.log src/core/__tests__/fixtures/<scenario>.jsonl
 docker compose ... down -v              # discard the generated certificate
 ```
 
-Renovate must start from a _pristine_ repository — leftover `renovate/*`
-branches make it take a different code path ("Branch already exists") and skip
-the very work the fixture captures. Close and delete them first.
+Renovate must start from a _pristine_ repository. Remaining `renovate/*` branches cause the "Branch already exists" code path. That code path skips the work that the fixture records. Before you regenerate a fixture, close the related Renovate PRs and delete their branches.
 
-[`.github/workflows/verify-fixtures.yml`](./.github/workflows/verify-fixtures.yml)
-automates all of this weekly (and on demand): one job per scenario, run strictly
-in sequence since they share one test repository, each starting by wiping every
-Renovate PR and branch. It overwrites the committed fixture with the freshly
-generated log and re-runs the fixture tests against it — so a Renovate release
-that renames a message or drops a field turns the workflow red. Nothing is
-committed back; the regenerated log is uploaded as an artifact so the fixture
-can be updated deliberately. The workflow needs a `TEST_REPO_PAT` secret (a
-fine-grained PAT with contents + pull-request write access to the test repo).
+The [`.github/workflows/verify-fixtures.yml`](./.github/workflows/verify-fixtures.yml) workflow automates this process each week and on demand. It uses one job for each scenario.
+
+The jobs run in sequence because they share one test repository. Each job first closes every Renovate PR and deletes every Renovate branch.
+
+The workflow overwrites the committed fixture with the new log. Then it runs the fixture tests with this log.
+
+If a Renovate release renames a message or removes a field, the workflow fails. It does not commit the new log.
+
+Instead, the workflow uploads the log as an artifact for an intentional fixture update. The workflow requires a `TEST_REPO_PAT` secret.
+
+This secret is a fine-grained PAT. It requires write access to contents and pull requests in the test repository.
 
 ### Linting & formatting
 
-[ESLint](https://eslint.org) (flat config) and [Prettier](https://prettier.io) are set up at the workspace root.
+[ESLint](https://eslint.org) uses a flat configuration at the workspace root. [Prettier](https://prettier.io) also has its configuration at the workspace root.
 
 ```bash
 npm run lint          # ESLint for src/ (type-aware) + web/ (Nuxt rules)
@@ -440,42 +403,26 @@ npm run format        # Prettier write pass over all non-ignored files
 npm run format:check  # Prettier check (no writes — useful in CI)
 ```
 
-- **Root (`src/`)** — [`eslint.config.mjs`](./eslint.config.mjs) uses `typescript-eslint` `recommendedTypeChecked` rules against `src/**/*.ts`, with `eslint-config-prettier` appended to disable any rules that conflict with Prettier. Prettier itself runs with its defaults (semicolons, double quotes, trailing commas).
-- **Web (`web/`)** — [`web/eslint.config.mjs`](./web/eslint.config.mjs) delegates to the auto-generated `@nuxt/eslint` config, which covers Vue, TypeScript, and Nuxt-specific rules. The `web/` directory is excluded from the root ESLint and Prettier configs so the two setups stay independent.
+- **Root (`src/`)**: [`eslint.config.mjs`](./eslint.config.mjs) applies the `typescript-eslint` `recommendedTypeChecked` rules to `src/**/*.ts`. It appends `eslint-config-prettier` to disable rules that conflict with Prettier. Prettier uses its defaults: semicolons, double quotes, and trailing commas.
+- **Web (`web/`)**: [`web/eslint.config.mjs`](./web/eslint.config.mjs) uses the generated `@nuxt/eslint` configuration. This configuration covers Vue, TypeScript, and Nuxt-specific rules. The root ESLint and Prettier configurations exclude `web/`. Therefore, the two configurations remain independent.
 
-### How it's built
+### How it is built
 
-- **CLI** — TypeScript compiled with `tsc` to ESM in `dist/`. Uses
-  [`yargs`](https://yargs.js.org) for command parsing.
-- **Frontend** — a Nuxt UI app built with `nuxt generate` and `ssr: false`, i.e.
-  a purely client-side SPA: `web/.output/public` holds an app shell plus static
-  assets, and nothing of Nitro/h3 is shipped or run. It shares the CLI's
-  filtering model and level metadata from `src/core/` (aliased into the bundle
-  as `renovate-core`), so the browser and the CLI speak about the same
-  SQLite-backed model.
-- **Backend** — a plain Express server in [`src/server/`](./src/server),
-  compiled by the same `tsc` pass as the CLI. It imports `src/core/` through
-  ordinary relative imports (no bundler, no alias), serves the `/api` routes
-  from `api.ts`, and serves the static SPA with an `index.html` fallback so
-  client-side routing works. `log-registry.ts` holds the process-wide "current
-  log" (one open `Parser`/SQLite handle per loaded md5, plus a memoized error
-  report). The `web` command spawns `dist/server/server-main.js` as a child
-  process; when given a log path it hands it off to the UI via a `?log=` query
-  parameter.
+- **CLI**: TypeScript compiles to ESM in `dist/` with `tsc`. The CLI uses [`yargs`](https://yargs.js.org) to parse commands.
+- **Frontend**: The Nuxt UI application uses `nuxt generate` and `ssr: false`. It is a client-side SPA. The `web/.output/public` directory contains an application shell and static assets. The package does not include Nitro/h3, and the application does not run it. The frontend shares the filtering model and level metadata from `src/core/` with the CLI. The bundle aliases this code as `renovate-core`.
+
+  Therefore, the browser and CLI use the same SQLite-backed model.
+
+- **Backend**: A plain Express server is in [`src/server/`](./src/server). The same `tsc` pass compiles the backend and CLI. The backend imports `src/core/` through ordinary relative imports without a bundler or alias. It provides the `/api` routes from `api.ts`. It also provides the static SPA with an `index.html` fallback for client-side routing. `log-registry.ts` holds the process-wide "current log".
+
+  It keeps one open `Parser`/SQLite handle for each loaded md5 and a memoized error report. The `web` command starts `dist/server/server-main.js` as a child process. When the user provides a log path, the command sends it to the UI in a `?log=` query parameter.
 
 ### What gets published
 
-Two `package.json` mechanisms cooperate so that both build outputs ship to npm:
+Two `package.json` mechanisms include both build outputs in the npm package:
 
-- **`files: ["dist", "web/.output/public"]`** — an allow-list of what goes into the
-  published tarball. npm always adds `package.json`, `README`, `LICENSE`, and the
-  `bin` target, then includes everything matched here — both directories,
-  recursively. This list takes precedence over `.gitignore`, which is why
-  `web/.output/` (gitignored as a build artifact) is still published.
-- **`prepublishOnly: "npm run build"`** — a lifecycle hook npm runs automatically
-  before packing on `npm publish`. It generates the static SPA and compiles the
-  CLI + server `dist`, so both directories exist and are current by the time the
-  `files` allow-list is evaluated.
+- **`files: ["dist", "web/.output/public"]`**: This allow-list controls the contents of the published tarball. npm always adds `package.json`, `README`, `LICENSE`, and the `bin` target. Then it recursively adds both listed directories. This list takes precedence over `.gitignore`. Therefore, npm publishes `web/.output/` although Git ignores it as a build artifact.
+- **`prepublishOnly: "npm run build"`**: Before npm creates the package for `npm publish`, it automatically runs this lifecycle hook. The hook generates the static SPA and compiles the CLI and server to `dist`. When npm evaluates the `files` allow-list, both directories exist and contain current files.
 
 ```
 npm publish
@@ -485,5 +432,6 @@ npm publish
   └─ upload to registry
 ```
 
-The result is a lean, self-contained package (no source or `node_modules` leak).
-Verify locally with `npm pack --dry-run`.
+The result is a small, self-contained package. It does not include source files or an unintended `node_modules` directory.
+
+Run `npm pack --dry-run` to inspect the package contents.
