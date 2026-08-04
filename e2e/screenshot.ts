@@ -36,6 +36,12 @@ const ARTIFACT_DIR = join(REPO_ROOT, "e2e-artifacts");
 /** Command that regenerates the baselines, quoted in every failure message. */
 const UPDATE_COMMAND = "npm run test:e2e:screenshots:update";
 
+/**
+ * How long `stabilize` waits for the web font. Generous: the point is to
+ * distinguish "not loaded yet" from "will never load", not to time anything.
+ */
+const FONT_TIMEOUT_MS = 10_000;
+
 /** `compare` asserts against the baselines, `update` rewrites them. */
 type ScreenshotMode = "compare" | "update";
 
@@ -74,11 +80,23 @@ export async function stabilize(page: Page): Promise<void> {
   // `font-display: swap` means the first paint can use the fallback font; wait
   // for the real one and fail loudly if it never arrives, because a silent
   // fallback would bake the wrong glyphs into a baseline.
-  await page.evaluate(() => document.fonts.ready);
-  const fontLoaded = await page.evaluate(() =>
-    document.fonts.check('16px "Public Sans"'),
-  );
-  if (!fontLoaded) {
+  //
+  // Poll rather than sample once. `document.fonts.ready` hands back the promise
+  // that already resolved during page load, so for a case that opens a panel
+  // after that point the freshly inserted text can put a face back into
+  // `loading` — and `check()` is false for anything not `loaded`. Reading both
+  // in the same frame, repeatedly, closes that window; a genuinely absent face
+  // still fails, just via the timeout.
+  try {
+    await page.waitForFunction(
+      async () => {
+        await document.fonts.ready;
+        return document.fonts.check('16px "Public Sans"');
+      },
+      undefined,
+      { timeout: FONT_TIMEOUT_MS },
+    );
+  } catch {
     throw new Error(
       'the self-hosted "Public Sans" face never loaded — the UI is rendering ' +
         "in a fallback font, so any baseline taken now would be meaningless",
