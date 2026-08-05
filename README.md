@@ -2,7 +2,7 @@
 
 <p align="center"><img src="./renovate-log-parser.webp" width="400" /></p>
 
-https://github.com/user-attachments/assets/38381841-c6fd-4d05-b4cf-6a897bef3c6b
+https://github.com/user-attachments/assets/f99595b5-d8bc-4dca-a662-550e502f05f4
 
 `renovate-log-parser` is a CLI and web interface for manual and automated analysis of Renovate Bot debug logs in JSONL format.
 
