@@ -8,10 +8,12 @@
 # before a user hits it. Nothing is committed back — the regenerated log is
 # uploaded as an artifact so the fixture can be updated deliberately.
 #
-# Scenario jobs run strictly one after another (`needs:`), because they all
-# drive the same test repository. Each one starts by wiping every Renovate PR
-# and branch, so Renovate always sees a pristine repository; otherwise it would
-# report "Branch already exists" and skip the work the fixture captures.
+# Scenario jobs that drive the shared test repository run strictly one after
+# another (`needs:`). Each one starts by wiping every Renovate PR and branch, so
+# Renovate always sees a pristine repository; otherwise it would report "Branch
+# already exists" and skip the work the fixture captures. The `invalid-config`
+# job is exempt: it uses Renovate's local platform against a directory, touches
+# no repository, and therefore runs in parallel.
 name: Verify log fixtures
 
 on:
@@ -85,3 +87,74 @@ jobs:
         with:
           github-token: ${{ secrets.TEST_REPO_PAT }}
           script: await require('./.github/scripts/cleanup-renovate-prs.cjs')({github, context, core})
+
+  # This is the only job that can run in parallel, because
+  # Renovate's "local" platform runs against a plain directory
+  # instead of a hosted repository, so this scenario needs no test repository,
+  # no PAT and no branch cleanup — which is why it has no `needs:` and runs in
+  # parallel with the chain above. It also cannot reuse the renovate-scenario
+  # composite action, whose first step wipes the test repository.
+  invalid-config:
+    name: invalid-config (local platform, unparseable renovate.jsonc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: "package.json"
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Renovate against a directory
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          cp src/core/__tests__/fixtures/invalid-config-repo/renovate.jsonc "$work/"
+          chmod -R a+rwX "$work"
+
+          # `--entrypoint renovate` bypasses the image's wrapper, so nothing
+          # chowns the log back to this user afterwards. Pre-create it writable:
+          # the container runs as uid 12021, the runner does not.
+          mkdir -p container-out-logs
+          chmod 777 container-out-logs
+          : > container-out-logs/out.log
+          chmod 666 container-out-logs/out.log
+
+          # Renovate exits 0 even though the config is unusable — that is the
+          # very gap this fixture documents, so the exit code is not a gate.
+          exit_code=0
+          docker run --rm \
+            -v "$work":/workspace -w /workspace \
+            -v "$PWD/container-out-logs":/logs \
+            -e LOG_LEVEL=debug \
+            -e LOG_FILE=/logs/out.log \
+            -e RENOVATE_PLATFORM=local \
+            --entrypoint renovate \
+            renovate/renovate:latest || exit_code=$?
+          echo "Renovate exited with code ${exit_code}"
+
+      - name: Overwrite the committed fixture
+        run: |
+          set -euo pipefail
+          log=container-out-logs/out.log
+          test -s "$log" || { echo "::error::Renovate produced no log at $log"; exit 1; }
+          cp "$log" src/core/__tests__/fixtures/invalid-config.jsonl
+          echo "Regenerated fixture: $(wc -l < "$log") lines"
+          # Informational only — a diff is expected (timestamps, pids, versions).
+          git --no-pager diff --stat -- src/core/__tests__/fixtures/invalid-config.jsonl || true
+
+      - name: Upload regenerated log
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: invalid-config-log
+          path: container-out-logs/out.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Verify fixture tests against the regenerated log
+        run: npm run test:fixtures

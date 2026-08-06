@@ -45,6 +45,11 @@ export const FINDING_CATEGORY_META: Record<
     icon: 'i-lucide-file-cog',
     severity: 'error'
   },
+  'invalid-config': {
+    label: 'Invalid config',
+    icon: 'i-lucide-file-x',
+    severity: 'error'
+  },
   'abandoned-package': {
     label: 'Abandoned packages',
     icon: 'i-lucide-package-x',

@@ -1,0 +1,24 @@
+// Deliberately malformed input for the `invalid-config` fixture scenario.
+//
+// This file is NEVER parsed by this repository's own tooling: it is copied into
+// a scratch directory and mounted into the Renovate container by the
+// `invalid-config` job in .github/workflows/verify-fixtures.yml. Renovate fails
+// to parse it and aborts the repository during `init`, which is exactly the
+// signal src/core/__tests__/fixtures/invalid-config.jsonl captures.
+//
+// Two deliberate syntax errors below: the first packageRules object is never
+// closed, and `nuxt` is an unquoted bare token. Do not "fix" them, and do not
+// reformat this file — it is listed in .prettierignore for that reason.
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "prHourlyLimit": 0,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group Nuxt updates",
+      "matchPackageNames": ["nuxt", "@nuxt/ui"],
+      "groupName": nuxt,
+  ],
+  "automerge": true,
+}

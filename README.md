@@ -108,6 +108,7 @@ renovate-log-parser detect-errors renovate.jsonl [--out report.json] \
   - `log-error`: lines with error level (level=50)
   - `log-fatal`: lines with fatal level (level=60)
   - `config-migration`: a repository needs a renovate.json migration. The detector looks for a `Config migration necessary` entry that contains `oldConfig` + `newConfig`.
+  - `invalid-config`: a repository's own Renovate config did not parse, or failed validation. Renovate aborts the run during `init`, so it extracts nothing and creates no PR. The detector looks for a `Repository has invalid config` entry and reports the offending file (`validationSource`) with the reason (`validationError`, `validationMessage`). Renovate logs this at warning level and still exits with code 0, which makes it easy to miss.
   - `abandoned-package`: a repository contains one or more abandoned packages for which Renovate does not create a PR. The detector reports one finding per package in an `Abandoned package statistics` entry.
 - **Warnings**:
   - `log-warn`: lines with warning level (level=40)
@@ -313,13 +314,16 @@ npm run test:e2e:screenshots:update  # rewrite the committed baselines
 Three suites detect different failure classes:
 
 - **Unit tests** (`src/core/__tests__/*.test.ts`): These tests use synthetic, manually written JSONL logs. Each log tests one detection contract.
-- **Fixture tests** (`src/core/__tests__/fixtures.test.ts`): The complete Parser → ErrorDetector/Analyzer pipeline runs on _real_ Renovate logs. These logs come from [`MShekow/renovate-log-parser-test`](https://github.com/MShekow/renovate-log-parser-test). The repository stores them in `src/core/__tests__/fixtures/`:
+- **Fixture tests** (`src/core/__tests__/fixtures.test.ts`): The complete Parser → ErrorDetector/Analyzer pipeline runs on _real_ Renovate logs. Most come from [`MShekow/renovate-log-parser-test`](https://github.com/MShekow/renovate-log-parser-test). The repository stores them in `src/core/__tests__/fixtures/`:
 
   | Fixture                       | What it demonstrates                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | `external-host-error.jsonl`   | NPM registry blocked → the run aborts with `result: "external-host-error"`                                                                                           |
   | `various-issues.jsonl`        | Abandoned packages, a required configuration migration, and an npm `lock file error` whose `err.stderr` reports a `Conflicting peer dependency`                      |
   | `failed-dotnet-install.jsonl` | `builds.dotnet.microsoft.com` blocked → `Datasource connection error` (`DEPTH_ZERO_SELF_SIGNED_CERT`) and `Failed to generate lock file` / "No tool releases found." |
+  | `invalid-config.jsonl`        | An unparseable `renovate.jsonc` → `Repository has invalid config` at warning level, and `result: "config-validation"`                                                |
+
+  The `invalid-config` fixture is the exception: Renovate ran with `--platform=local` against a directory, so there is no test repository and the repository is named `local`. Its input is `src/core/__tests__/fixtures/invalid-config-repo/renovate.jsonc`, which is malformed on purpose. Do not reformat that file. It is listed in `.prettierignore`.
 
   The assertions are _semantic_, not snapshot-based. A Renovate log contains variable data, such as timestamps, pid, hostname, logContext, and dependency versions. The assertions cover only the signals that each scenario demonstrates.
 
@@ -381,9 +385,28 @@ docker compose ... down -v              # discard the generated certificate
 
 Renovate must start from a _pristine_ repository. Remaining `renovate/*` branches cause the "Branch already exists" code path. That code path skips the work that the fixture records. Before you regenerate a fixture, close the related Renovate PRs and delete their branches.
 
+The `invalid-config` fixture does not use this stack. It runs Renovate's [local platform](https://docs.renovatebot.com/modules/platform/local) against a directory, so it needs no test repository, no token and no firewall:
+
+```bash
+work="$(mktemp -d)"                     # must be outside a Git work tree
+cp src/core/__tests__/fixtures/invalid-config-repo/renovate.jsonc "$work/"
+chmod -R a+rwX "$work"
+mkdir -p container-out-logs && chmod 777 container-out-logs
+: > container-out-logs/out.log && chmod 666 container-out-logs/out.log
+
+docker run --rm -v "$work":/workspace -w /workspace \
+  -v "$PWD/container-out-logs":/logs \
+  -e LOG_LEVEL=debug -e LOG_FILE=/logs/out.log -e RENOVATE_PLATFORM=local \
+  --entrypoint renovate renovate/renovate:latest
+
+cp container-out-logs/out.log src/core/__tests__/fixtures/invalid-config.jsonl
+```
+
+Two details matter here. The scratch directory must be outside a Git work tree, because Renovate lists files with `git ls-files` and only falls back to a glob when that command fails. Inside a work tree it succeeds and returns the wrong files. The log file must also be created in advance and made writable, because `--entrypoint renovate` skips the wrapper that normally returns ownership of the log to your user.
+
 The [`.github/workflows/verify-fixtures.yml`](./.github/workflows/verify-fixtures.yml) workflow automates this process each week and on demand. It uses one job for each scenario.
 
-The jobs run in sequence because they share one test repository. Each job first closes every Renovate PR and deletes every Renovate branch.
+The jobs that share the test repository run in sequence. Each of these jobs first closes every Renovate PR and deletes every Renovate branch. The `invalid-config` job uses no repository, so it runs in parallel.
 
 The workflow overwrites the committed fixture with the new log. Then it runs the fixture tests with this log.
 

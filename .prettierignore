@@ -1,3 +1,8 @@
 dist
 node_modules
 web
+
+# Deliberately malformed Renovate config driving the `invalid-config` fixture
+# scenario. Prettier cannot parse it, and reformatting it would destroy the very
+# syntax errors the fixture exists to reproduce.
+src/core/__tests__/fixtures/invalid-config-repo

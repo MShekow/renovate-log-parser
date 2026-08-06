@@ -248,6 +248,10 @@ npx --yes renovate-log-parser detect-errors <path-to-log.jsonl>
   - \`log-fatal\`: lines with fatal level (\`level=60\`)
   - \`config-migration\`: when a repository needs a renovate.json migration; looks for a
     \`Config migration necessary\` entry carrying \`oldConfig\` + \`newConfig\`
+  - \`invalid-config\`: when a repository's own Renovate config could not be parsed or
+    failed validation, so the run aborted before extracting anything; looks for a
+    \`Repository has invalid config\` entry, whose \`err\` names the offending file
+    (\`validationSource\`) and the reason (\`validationError\`, \`validationMessage\`)
   - \`abandoned-package\`: when a repository contains one or more abandoned packages for
     which Renovate would not create a PR; reports one finding per package in an
     \`Abandoned package statistics\` entry

@@ -15,8 +15,8 @@
  *
  * The error/warning split is scoped to problems Renovate would *not* otherwise
  * surface in a PR comment: `host-error-abort`, `log-error`, `log-fatal`,
- * `config-migration`, and `abandoned-package` are errors (exit 1); `log-warn`,
- * `err-object`, and `repo-problem` are warnings.
+ * `config-migration`, `invalid-config`, and `abandoned-package` are errors
+ * (exit 1); `log-warn`, `err-object`, and `repo-problem` are warnings.
  */
 import { ERROR_LEVELS, WARN_LEVEL } from "./levels.js";
 import type { Parser } from "./parser.js";
@@ -32,6 +32,7 @@ export const CATEGORIES = [
   "log-fatal",
   "err-object",
   "config-migration",
+  "invalid-config",
   "abandoned-package",
   "repo-problem",
 ] as const;
@@ -50,6 +51,7 @@ export const SEVERITY: Readonly<Record<Category, Severity>> = {
   "log-fatal": "error",
   "err-object": "warning",
   "config-migration": "error",
+  "invalid-config": "error",
   "abandoned-package": "error",
   "repo-problem": "warning",
 };
@@ -62,6 +64,14 @@ const HOST_ERROR_RESULT = "external-host-error";
 
 /** The exact `msg` that marks a required config migration. */
 const CONFIG_MIGRATION_MSG = "Config migration necessary";
+
+/**
+ * The exact `msg` Renovate logs when a repository's own Renovate config could
+ * not be used — either because the file is not parseable, or because it parses
+ * but fails schema validation. Both cases abort the repository during `init`,
+ * so nothing is extracted, looked up or updated.
+ */
+const INVALID_CONFIG_MSG = "Repository has invalid config";
 
 /** The exact `msg` that carries abandoned-package statistics. */
 const ABANDONED_PACKAGE_MSG = "Abandoned package statistics";
@@ -133,6 +143,7 @@ export class ErrorDetector {
           values: [
             REPOSITORY_FINISHED_MSG,
             CONFIG_MIGRATION_MSG,
+            INVALID_CONFIG_MSG,
             ABANDONED_PACKAGE_MSG,
           ],
         },
@@ -276,6 +287,12 @@ function collectFindings(
     push("config-migration", msg, { keys: ["oldConfig", "newConfig"] });
   }
 
+  // invalid-config — the repository's Renovate config could not be parsed or
+  // validated, so the run aborted during `init` without doing any work.
+  if (msg === INVALID_CONFIG_MSG) {
+    push("invalid-config", msg, validationDetails(entry));
+  }
+
   // abandoned-package — one finding per package, keyed as `datasource:package`.
   // The entry carries datasource-named objects (e.g. `npm`, `crate`) mapping a
   // package name to its last-update timestamp; string/number metadata fields are
@@ -315,4 +332,31 @@ function errDetails(entry: LogEntry): Record<string, unknown> | undefined {
     return { err };
   }
   return undefined;
+}
+
+/**
+ * Lift the config-validation fields off an entry's `err` object.
+ *
+ * Only the three `validation*` fields are kept, deliberately: they name the
+ * offending file and say what is wrong with it, which is the actionable part.
+ * The full `err` (including its multi-line `stack`) is already carried by the
+ * `err-object` finding produced for the very same line.
+ */
+function validationDetails(
+  entry: LogEntry,
+): Record<string, unknown> | undefined {
+  const err = entry.err;
+  if (err === null || typeof err !== "object" || Array.isArray(err)) {
+    return undefined;
+  }
+  const details: Record<string, unknown> = {};
+  for (const field of [
+    "validationSource",
+    "validationError",
+    "validationMessage",
+  ]) {
+    const value = (err as LogEntry)[field];
+    if (typeof value === "string") details[field] = value;
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
 }

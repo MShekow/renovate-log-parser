@@ -3,8 +3,11 @@
  *
  * Unlike the synthetic tests in `error-detector.test.ts`, these run the full
  * Parser → ErrorDetector / Analyzer pipeline over committed logs captured from
- * actual Renovate runs against `MShekow/renovate-log-parser-test`
- * (see `.github/workflows/verify-fixtures.yml`, which regenerates them).
+ * actual Renovate runs. Most are captured against
+ * `MShekow/renovate-log-parser-test`; the `invalid-config` scenario instead
+ * runs Renovate with `--platform=local` against a directory, needing no test
+ * repository and no credentials (see `.github/workflows/verify-fixtures.yml`,
+ * which regenerates them all).
  *
  * Assertions are deliberately *semantic*, never snapshot-based: a Renovate log
  * is full of volatile data (timestamps, pid, hostname, logContext, dependency
@@ -20,20 +23,57 @@ import { Parser } from "../parser.js";
 import { ErrorDetector, type DetectionReport } from "../error-detector.js";
 import { Analyzer } from "../analyzer.js";
 
-/** The repository every fixture was captured against. */
+/** The repository the platform-backed fixtures were captured against. */
 const TEST_REPOSITORY = "MShekow/renovate-log-parser-test";
 
-/** Fixture names (also the file basenames and the CI job/scenario names). */
-const FIXTURES = [
-  "external-host-error",
-  "various-issues",
-  "failed-dotnet-install",
-] as const;
+/** What a fixture is expected to look like, independent of its scenario. */
+interface FixtureMeta {
+  /** The repository name the log was captured against. */
+  repository: string;
+  /** Lower bound on the line count; a shorter log means a truncated capture. */
+  minLines: number;
+  /**
+   * True for the scenarios driven against {@link TEST_REPOSITORY} through
+   * Docker Compose. They share a set of extra invariants (notably the pending
+   * config migration) that the local-platform scenario cannot satisfy.
+   */
+  testRepoScenario: boolean;
+}
 
-type FixtureName = (typeof FIXTURES)[number];
+/** Every fixture (the keys are also the file basenames and CI job names). */
+const FIXTURES = {
+  "external-host-error": {
+    repository: TEST_REPOSITORY,
+    minLines: 100,
+    testRepoScenario: true,
+  },
+  "various-issues": {
+    repository: TEST_REPOSITORY,
+    minLines: 100,
+    testRepoScenario: true,
+  },
+  "failed-dotnet-install": {
+    repository: TEST_REPOSITORY,
+    minLines: 100,
+    testRepoScenario: true,
+  },
+  // Captured with `--platform=local` against a directory, so Renovate names the
+  // repository "local". The run aborts during `init`, which is why this log is
+  // an order of magnitude shorter than the others.
+  "invalid-config": {
+    repository: "local",
+    minLines: 40,
+    testRepoScenario: false,
+  },
+} satisfies Record<string, FixtureMeta>;
+
+type FixtureName = keyof typeof FIXTURES;
 
 /** A parsed log entry (Renovate emits many optional fields). */
 type LogEntry = Record<string, unknown>;
+
+/** Every fixture name. */
+const FIXTURE_NAMES = Object.keys(FIXTURES) as FixtureName[];
 
 /** Absolute path of a fixture log. */
 function fixturePath(name: FixtureName): string {
@@ -94,13 +134,15 @@ function errString(entry: LogEntry, field: string): string {
 // Shared invariants
 // ---------------------------------------------------------------------------
 
-for (const name of FIXTURES) {
+for (const name of FIXTURE_NAMES) {
+  const meta: FixtureMeta = FIXTURES[name];
+
   test(`${name}: fixture is a well-formed, non-truncated Renovate log`, () => {
     withFixture(name, (parser) => {
       const loaded = parser.loaded;
       assert.ok(loaded !== undefined);
       assert.ok(
-        loaded.totalLines > 100,
+        loaded.totalLines > meta.minLines,
         `fixture looks truncated (${loaded.totalLines} lines)`,
       );
 
@@ -118,15 +160,15 @@ for (const name of FIXTURES) {
     });
   });
 
-  test(`${name}: analyzer reports the test repository`, () => {
+  test(`${name}: analyzer reports the captured repository`, () => {
     withFixture(name, (parser) => {
       const stats = new Analyzer(parser).stats();
       assert.ok(
         Object.keys(stats.levelCounts).length > 0,
         "expected per-level counts",
       );
-      const repo = stats.repos.find((r) => r.name === TEST_REPOSITORY);
-      assert.ok(repo !== undefined, `expected stats for ${TEST_REPOSITORY}`);
+      const repo = stats.repos.find((r) => r.name === meta.repository);
+      assert.ok(repo !== undefined, `expected stats for ${meta.repository}`);
       assert.ok(repo.toLine >= repo.fromLine);
 
       // The stats payload is emitted as compact single-line JSON by the
@@ -134,6 +176,8 @@ for (const name of FIXTURES) {
       assert.ok(JSON.stringify(stats).length > 0);
     });
   });
+
+  if (!meta.testRepoScenario) continue;
 
   test(`${name}: config migration is detected`, () => {
     const report = detect(name);
@@ -291,4 +335,95 @@ test("failed-dotnet-install: abandoned packages are still reported despite the t
     report.counts["abandoned-package"] >= 3,
     `expected >= 3 abandoned packages, got ${report.counts["abandoned-package"]}`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// invalid-config — `renovate --platform=local` against a directory whose
+// renovate.jsonc does not parse
+// ---------------------------------------------------------------------------
+
+test("invalid-config: a malformed renovate.jsonc is reported as an error", () => {
+  const report = detect("invalid-config");
+  const findings = report.findings.filter(
+    (f) => f.category === "invalid-config",
+  );
+  assert.equal(findings.length, 1, "expected exactly one invalid-config");
+  assert.equal(report.counts["invalid-config"], 1);
+
+  const [finding] = findings;
+  assert.equal(finding.severity, "error");
+  assert.equal(finding.repository, "local");
+  assert.equal(finding.details?.validationSource, "renovate.jsonc");
+  assert.equal(
+    finding.details?.validationError,
+    "Invalid JSON (parsing failed)",
+  );
+  assert.match(String(finding.details?.validationMessage), /Syntax error/);
+
+  // The whole point: a repository whose config Renovate cannot read does no
+  // work at all, so this must break the build.
+  assert.equal(report.exitCode, 1, "an unusable config must exit 1");
+});
+
+test("invalid-config: the finding does not rely on the entry's log level", () => {
+  withFixture("invalid-config", (parser) => {
+    const { line, entry } = findEntry(
+      parser,
+      'msg="Repository has invalid config"',
+      (e) => e.msg === "Repository has invalid config",
+    );
+
+    // Renovate logs this at level 40 unless `configValidationError` is enabled,
+    // and exits 0 either way. Detection is therefore anchored on the message,
+    // not the level — without that, a completely unusable config would surface
+    // as nothing more than a warning.
+    assert.equal(entry.level, 40);
+    assert.equal(errString(entry, "message"), "config-validation");
+    assert.equal(errString(entry, "validationSource"), "renovate.jsonc");
+
+    const report = new ErrorDetector(parser).run();
+    const finding = report.findings.find(
+      (f) => f.category === "invalid-config",
+    );
+    assert.ok(finding !== undefined);
+    assert.equal(
+      finding.line,
+      line,
+      "the finding must point at the diagnostic entry",
+    );
+  });
+});
+
+test("invalid-config: the repository run ends with result 'config-validation'", () => {
+  withFixture("invalid-config", (parser) => {
+    const { entry } = findEntry(
+      parser,
+      'msg="Repository finished" with result="config-validation"',
+      (e) => e.msg === "Repository finished",
+    );
+    assert.equal(entry.result, "config-validation");
+    assert.equal(entry.repository, "local");
+  });
+});
+
+test("invalid-config: the run aborts in init, before anything is extracted", () => {
+  withFixture("invalid-config", (parser) => {
+    const { entry } = findEntry(
+      parser,
+      'msg="Repository timing splits (milliseconds)"',
+      (e) => e.msg === "Repository timing splits (milliseconds)",
+    );
+    const splits = entry.splits as Record<string, unknown>;
+    // A broken config aborts during `init`, so no dependency is ever extracted
+    // or looked up. If Renovate ever changes to extract first, this flips.
+    assert.equal(splits.extract, 0);
+    assert.equal(splits.lookup, 0);
+    assert.equal(splits.update, 0);
+
+    const stats = new Analyzer(parser).stats();
+    const repo = stats.repos.find((r) => r.name === "local");
+    assert.ok(repo !== undefined);
+    assert.deepEqual(repo.depNames, [], "nothing may be extracted");
+    assert.deepEqual(repo.branches, [], "no branch may be planned");
+  });
 });
