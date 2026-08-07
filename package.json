@@ -1,6 +1,6 @@
 {
   "name": "renovate-log-parser",
-  "version": "0.1.2",
+  "version": "0.3.0",
   "description": "A CLI that parses Renovate Bot debug logs to auto-detect issues, with an optional Nuxt-based web UI.",
   "type": "module",
   "bin": {

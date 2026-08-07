@@ -12,7 +12,7 @@ const { searchPattern, searchField } = filters
 
 /**
  * Fields available as the search target: "Raw search" (whole line, any key or
- * value) first, then `msg`, then the log's other root keys.
+ * value) first, then `msg`, then the open log's other root keys.
  */
 const searchFields = ref<string[]>([RAW_SEARCH, 'msg'])
 
@@ -22,7 +22,7 @@ async function fetchSearchFields(): Promise<void> {
     return
   }
   try {
-    const all = await $fetch<string[]>('/api/fields')
+    const all = await apiFetch<string[]>('/api/fields')
     searchFields.value = [RAW_SEARCH, 'msg', ...all.filter(f => f !== 'msg')]
   } catch {
     searchFields.value = [RAW_SEARCH, 'msg']

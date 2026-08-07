@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * RepositoryFilterMenu — the static "repositories" dropdown.
- * Lists the distinct `repository` values in the current log (verbatim,
+ * Lists the distinct `repository` values in the open log (verbatim,
  * incl. git-URL sub-repos) as checkboxes, plus an include/exclude mode switch
  * and a "Repository-independent" pseudo-entry for entries with no `repository`.
  * Maps to a single `inSet` filter server-side.
@@ -13,7 +13,7 @@ const repositories = ref<string[]>([])
 const loading = ref(false)
 const search = ref('')
 
-/** (Re)fetch the distinct repositories for the current log. */
+/** (Re)fetch the distinct repositories for the open log. */
 async function fetchRepositories(): Promise<void> {
   if (!log.info.value) {
     repositories.value = []
@@ -21,7 +21,7 @@ async function fetchRepositories(): Promise<void> {
   }
   loading.value = true
   try {
-    repositories.value = await $fetch<string[]>('/api/repositories')
+    repositories.value = await apiFetch<string[]>('/api/repositories')
   } catch {
     repositories.value = []
   } finally {

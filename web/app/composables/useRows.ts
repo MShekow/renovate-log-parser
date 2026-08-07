@@ -12,7 +12,8 @@
  * change the page calls {@link reload} to drop the (now-stale) cache.
  *
  * Created once per page instance (not a singleton) so a fresh log gets a clean
- * cache via {@link reload}.
+ * cache via {@link reload}. Requests go through {@link apiFetch}, which tags
+ * them with the md5 of the log this tab has open.
  */
 import type { RowDTO, RowsResponse } from '~/types'
 
@@ -29,38 +30,45 @@ export function useRows(getFilters?: () => string | undefined) {
   const loadedPages = new Set<number>()
   const inflight = new Set<number>()
 
-  /** Fetch one page (idempotent per page for the current log). */
+  /** Fetch one page (idempotent per page for the open log). */
   async function fetchPage(page: number): Promise<void> {
     if (page < 0 || loadedPages.has(page) || inflight.has(page)) return
     inflight.add(page)
     try {
       const offset = page * PAGE_SIZE
-      const query: Record<string, string | number> = { offset, limit: PAGE_SIZE }
+      const query: ApiQuery = { offset, limit: PAGE_SIZE }
       const filters = getFilters?.()
       if (filters && filters !== '{}') query.filters = filters
-      const res = await $fetch<RowsResponse>('/api/rows', { query })
+      const res = await apiFetch<RowsResponse>('/api/rows', { query })
       total.value = res.total
       const next = new Map(rows.value)
       res.rows.forEach((row, i) => next.set(offset + i, row))
       rows.value = next
       loadedPages.add(page)
     } catch (err) {
-      error.value = messageOf(err)
+      // A scroll can race a log being closed; that is not worth an error banner.
+      if (!(err instanceof NoLogOpenError)) error.value = messageOf(err)
     } finally {
       inflight.delete(page)
     }
   }
 
-  /** Reset all cached state and fetch the first page for the new current log. */
+  /** Reset all cached state and fetch the first page for the newly-open log. */
   async function reload(): Promise<void> {
+    reset()
+    ready.value = false
+    await fetchPage(0)
+    ready.value = true
+  }
+
+  /** Drop every cached row without fetching — for when the log is closed. */
+  function reset(): void {
     total.value = 0
     rows.value = new Map()
     loadedPages.clear()
     inflight.clear()
     error.value = null
     ready.value = false
-    await fetchPage(0)
-    ready.value = true
   }
 
   /** Ensure every page covering result indices [start, end) is fetched. */
@@ -71,7 +79,7 @@ export function useRows(getFilters?: () => string | undefined) {
     for (let p = firstPage; p <= lastPage; p++) void fetchPage(p)
   }
 
-  return { total, ready, error, rows, reload, ensureRange, PAGE_SIZE }
+  return { total, ready, error, rows, reload, reset, ensureRange, PAGE_SIZE }
 }
 
 /** Extract a human-readable message from a `$fetch`/H3 error. */

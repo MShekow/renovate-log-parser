@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** There is an automatic release GitHub workflow which regularly pushes new _patch-level_ (x.y.**z**) releases to NPM, whenever there are updates for the underlying dependencies used by renovate-log-parser. These patch versions do _not_ appear in this changelog!
 
+## [0.3.0] - 2026-08-07
+
+### Added
+
+- `detect-errors` command supports new category "invalid-config" (detecting when `renovate.json` has invalid syntax)
+
+### Fixed
+
+- API server and web frontend support _multiple_ opened files in parallel, allowing you to have several browser tabs open with different files
+
 ## [0.2.0] - 2026-08-01
 
 ### Added

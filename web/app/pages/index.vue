@@ -2,8 +2,13 @@
 /**
  * Main log viewer: a virtualized, fixed-row-height list of every log
  * line (level glyph + `msg`) with an on-demand details slide-over. The header
- * shows the current log path, a file picker (POST /api/log/contents) and a level
- * breakdown. On mount it reads `?log=` and loads that path (the CLI handoff).
+ * shows the open log's path, a file picker (POST /api/log/contents) and a level
+ * breakdown.
+ *
+ * The open log is identified by its md5, which this page mirrors into `?md5=` so
+ * the tab restores itself on reload — and so two tabs stay on two different logs
+ * (the backend keys every read by md5 and holds no "current log"). On mount it
+ * prefers that `?md5=`, falling back to the CLI's `?log=<absolute path>` handoff.
  */
 import { levelMeta } from 'renovate-core/levels'
 import type { RowDTO } from '~/types'
@@ -14,11 +19,12 @@ const ROW_HEIGHT = 28
 const OVERSCAN = 10
 
 const route = useRoute()
+const router = useRouter()
 const log = useLog()
 const filters = useFilters()
 const findings = useFindings()
 const toast = useToast()
-const { total, ready, error: rowsError, rows, reload, ensureRange } = useRows(
+const { total, ready, error: rowsError, rows, reload, reset, ensureRange } = useRows(
   () => filters.serialized.value
 )
 
@@ -66,7 +72,7 @@ onBeforeUnmount(() => {
 })
 
 // --- Log loading -----------------------------------------------------------
-// When a new log becomes current, reset filters + scroll and reload the cache.
+// When a log is opened, reset filters + scroll and reload the cache.
 // `suppressRefetch` swallows the filter-change refetch that resetting filters
 // would otherwise trigger, so a new log reloads exactly once.
 let suppressRefetch = false
@@ -75,7 +81,17 @@ let refetchTimer: ReturnType<typeof setTimeout> | undefined
 watch(
   () => log.info.value?.md5,
   async (md5) => {
-    if (!md5) return
+    // The log was closed (`apiFetch` clears it on a 404): drop the stale view
+    // and the now-meaningless query param.
+    if (!md5) {
+      reset()
+      findings.reset()
+      await router.replace({ query: {} })
+      return
+    }
+    // Keep the md5 in the URL so a reload restores this tab. This also drops
+    // the `?log=` handoff, which has served its purpose by now.
+    if (route.query.md5 !== md5) await router.replace({ query: { md5 } })
     suppressRefetch = true
     filters.reset()
     await nextTick()
@@ -104,12 +120,26 @@ watch(filters.serialized, () => {
 })
 
 onMounted(async () => {
-  const q = route.query.log
-  const logPath = Array.isArray(q) ? q[0] : q
-  if (typeof logPath === 'string' && logPath.length > 0) {
+  // `?md5=` restores this tab's log after a reload. It wins over `?log=`: it is
+  // what this page itself wrote, whereas `?log=` is only the CLI's initial
+  // handoff. A stale md5 (the server restarted) just falls through to `?log=`.
+  const md5 = firstQueryValue(route.query.md5)
+  if (md5 && (await log.restore(md5))) return
+
+  const logPath = firstQueryValue(route.query.log)
+  if (logPath) {
     await log.loadFromPath(logPath)
+    return
   }
+  // Nothing to open — clear a stale `?md5=` so the URL matches the empty state.
+  if (md5) await router.replace({ query: {} })
 })
+
+/** Read a single string out of a query param that may repeat. */
+function firstQueryValue(value: unknown): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value
+  return typeof first === 'string' && first.length > 0 ? first : undefined
+}
 
 // --- File picker -----------------------------------------------------------
 const fileInput = ref<HTMLInputElement | null>(null)

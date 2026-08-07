@@ -1,14 +1,14 @@
 /**
- * `useFindings` — reactive error-detector report for the current log.
+ * `useFindings` — reactive error-detector report for the log this tab has open.
  *
  * `GET /api/findings` returns the findings the shared `ErrorDetector` produced
- * for the current log (errors + warnings, no ignore rules). This composable is
- * the client mirror: it fetches once per log and exposes the report plus a few
+ * for that log (errors + warnings, no ignore rules). This composable is the
+ * client mirror: it fetches once per log and exposes the report plus a few
  * derived views the header badges and the Problems panel consume.
  *
  * It is a module-level singleton (like {@link useLog} / {@link useFilters}) so
  * the header button and the slide-over observe the same state. {@link load} is
- * called by the page whenever a new log becomes current.
+ * called by the page whenever a new log is opened.
  */
 import type { FindingsResponse, FindingDTO } from '~/types'
 import type { Category } from 'renovate-core/error-detector'
@@ -37,13 +37,13 @@ function messageOf(err: unknown): string {
 }
 
 export function useFindings() {
-  /** Fetch the report for the current log, replacing any previous one. */
+  /** Fetch the report for the open log, replacing any previous one. */
   async function load(): Promise<void> {
     loading.value = true
     error.value = null
     report.value = null
     try {
-      report.value = await $fetch<FindingsResponse>('/api/findings')
+      report.value = await apiFetch<FindingsResponse>('/api/findings')
     } catch (err) {
       error.value = messageOf(err)
     } finally {

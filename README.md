@@ -240,6 +240,8 @@ This command starts the bundled web UI for interactive, filtered log analysis. T
 
 A small [Express](https://expressjs.com) server provides the UI and exposes the `/api` endpoints. The server keeps the SQLite-backed parsed log on disk. It streams paged rows to the client.
 
+You can open more than one log at the same time. Open a second browser tab and pick a different file. Each tab keeps its own log and its own filters. The tab keeps its log in the URL, so a page reload restores it.
+
 To open a log automatically, provide its optional path. Otherwise, use the file picker in the UI.
 
 | Arg / option | Default     | Description                                        |
@@ -436,9 +438,9 @@ npm run format:check  # Prettier check (no writes — useful in CI)
 
   Therefore, the browser and CLI use the same SQLite-backed model.
 
-- **Backend**: A plain Express server is in [`src/server/`](./src/server). The same `tsc` pass compiles the backend and CLI. The backend imports `src/core/` through ordinary relative imports without a bundler or alias. It provides the `/api` routes from `api.ts`. It also provides the static SPA with an `index.html` fallback for client-side routing. `log-registry.ts` holds the process-wide "current log".
+- **Backend**: A plain Express server is in [`src/server/`](./src/server). The same `tsc` pass compiles the backend and CLI. The backend imports `src/core/` through ordinary relative imports without a bundler or alias. It provides the `/api` routes from `api.ts`. It also provides the static SPA with an `index.html` fallback for client-side routing. `log-registry.ts` keeps every loaded log, keyed by its content md5.
 
-  It keeps one open `Parser`/SQLite handle for each loaded md5 and a memoized error report. The `web` command starts `dist/server/server-main.js` as a child process. When the user provides a log path, the command sends it to the UI in a `?log=` query parameter.
+  It keeps one open `Parser`/SQLite handle for each loaded md5 and a memoized error report. The read endpoints are stateless: each `GET` gives the md5 of the log to read in a query parameter. There is no server-side "current log". Therefore, each browser tab can show a different log. The `web` command starts `dist/server/server-main.js` as a child process. When the user provides a log path, the command sends it to the UI in a `?log=` query parameter. The UI then replaces that parameter with `?md5=`, which lets the tab restore its log after a page reload.
 
 ### What gets published
 

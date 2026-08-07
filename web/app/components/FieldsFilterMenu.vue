@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * FieldsFilterMenu — the static "ignored fields" dropdown. Lists the
- * distinct root-level keys in the current log (from `GET /api/fields`) as
+ * distinct root-level keys in the open log (from `GET /api/fields`) as
  * checkboxes; a checked field is stripped from every row (and the details
  * panel). `msg` is never listable/strippable. This shapes the response
  * projection, not row matching.
@@ -13,7 +13,7 @@ const fields = ref<string[]>([])
 const loading = ref(false)
 const search = ref('')
 
-/** (Re)fetch the distinct root keys for the current log. */
+/** (Re)fetch the distinct root keys for the open log. */
 async function fetchFields(): Promise<void> {
   if (!log.info.value) {
     fields.value = []
@@ -21,7 +21,7 @@ async function fetchFields(): Promise<void> {
   }
   loading.value = true
   try {
-    const all = await $fetch<string[]>('/api/fields')
+    const all = await apiFetch<string[]>('/api/fields')
     fields.value = all.filter(f => f !== 'msg')
   } catch {
     fields.value = []

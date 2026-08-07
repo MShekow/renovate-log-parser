@@ -1,12 +1,13 @@
 /**
- * Stateful, process-wide log registry for the web backend.
+ * Process-wide log registry for the web backend.
  *
  * The `web` command runs a single long-lived Express process for one user, so we
  * keep every loaded log's open {@link Parser} (and its SQLite handle) in memory
- * keyed by content md5, plus a `current` pointer. A successful load sets
- * `current`; the GET routes always operate on `current` — there is no per-request
- * `md5` override. Loading a new file simply moves the pointer (the previous
- * handle stays cached for cheap re-selection).
+ * keyed by content md5. There is no "current log": the registry holds no pointer
+ * and the GET routes name the log they want via a required `md5` request
+ * parameter (see {@link getParser}). That keeps the reads stateless, so several
+ * browser tabs can each view a different log against the same server without
+ * clobbering one another.
  */
 import { createHash } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
@@ -42,15 +43,12 @@ export interface LoadedLogInfo {
 /** md5 -> loaded log. Persists for the lifetime of the server process. */
 const registry = new Map<string, RegistryEntry>();
 
-/** The md5 of the log the GET routes currently operate on. */
-let current: string | null = null;
-
 /** Prefix for uploaded-file temp copies (distinct from Parser's cache files). */
 const UPLOAD_PREFIX = "renovate-log-parser-upload-";
 const UPLOAD_SUFFIX = ".jsonl";
 
 /**
- * Load a log from an absolute filesystem path and make it current.
+ * Load a log from an absolute filesystem path and register it.
  *
  * @throws {HttpError} when the path is not absolute / missing, or the parse
  *   fails — the route layer maps these to HTTP responses.
@@ -123,7 +121,44 @@ function loadInto(absolutePath: string): LoadedLogInfo {
     registry.set(md5, { path: absolutePath, parser });
   }
 
-  current = md5;
+  return describe(md5, parser);
+}
+
+/**
+ * Return the parser for a registered log, or throw a 404 when that md5 is
+ * unknown (never loaded, or the server restarted since). The GET routes call
+ * this first with the md5 the client asked for.
+ */
+export function getParser(md5: string): Parser {
+  return requireEntry(md5).parser;
+}
+
+/**
+ * Return the error-detector report for a registered log, computing (and
+ * caching) it on first request. Runs without ignore rules — the web surfaces
+ * every finding. Throws a 404 for an unknown md5 (via {@link requireEntry}).
+ */
+export function getFindings(md5: string): DetectionReport {
+  const entry = requireEntry(md5);
+  if (!entry.report) {
+    entry.report = new ErrorDetector(entry.parser).run();
+  }
+  return entry.report;
+}
+
+/**
+ * Rebuild the load metadata for an already-registered log. Lets a client that
+ * only holds an md5 (e.g. a tab restoring itself from its URL after a reload)
+ * recover the full {@link LoadedLogInfo} without re-uploading the file.
+ *
+ * @throws {HttpError} 404 when the md5 is not registered.
+ */
+export function getLogInfo(md5: string): LoadedLogInfo {
+  return describe(md5, requireEntry(md5).parser);
+}
+
+/** Build the client-facing metadata for a loaded parser. */
+function describe(md5: string, parser: Parser): LoadedLogInfo {
   const info = parser.loaded!;
   return {
     md5,
@@ -133,40 +168,14 @@ function loadInto(absolutePath: string): LoadedLogInfo {
   };
 }
 
-/**
- * Return the parser for the current log, or throw a 409 when none is loaded.
- * The GET routes call this first.
- */
-export function requireCurrentParser(): Parser {
-  return requireCurrentEntry().parser;
-}
-
-/**
- * Return the error-detector report for the current log, computing (and caching)
- * it on first request. Runs without ignore rules — the web surfaces every
- * finding. Throws a 409 when no log is loaded (via {@link requireCurrentEntry}).
- */
-export function requireCurrentFindings(): DetectionReport {
-  const entry = requireCurrentEntry();
-  if (!entry.report) {
-    entry.report = new ErrorDetector(entry.parser).run();
-  }
-  return entry.report;
-}
-
-/** Resolve the current registry entry, or throw a 409 when none is loaded. */
-function requireCurrentEntry(): RegistryEntry {
-  if (current === null) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: "No log is loaded. POST a log to /api/log/path first.",
-    });
-  }
-  const entry = registry.get(current);
+/** Resolve a registry entry by md5, or throw a 404 when it is not loaded. */
+function requireEntry(md5: string): RegistryEntry {
+  const entry = registry.get(md5);
   if (!entry) {
-    // Defensive: pointer without an entry should never happen.
-    current = null;
-    throw createError({ statusCode: 409, statusMessage: "No log is loaded." });
+    throw createError({
+      statusCode: 404,
+      statusMessage: `Log ${md5} is not loaded. POST it to /api/log/path or /api/log/contents first.`,
+    });
   }
   return entry;
 }
