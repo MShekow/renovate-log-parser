@@ -6,11 +6,11 @@ https://github.com/user-attachments/assets/f99595b5-d8bc-4dca-a662-550e502f05f4
 
 `renovate-log-parser` is a CLI and web interface for manual and automated analysis of Renovate Bot debug logs in JSONL format.
 
-To get this log: if you use the _hosted_ Mend GitHub app, download a run log from [https://developer.mend.io](https://developer.mend.io). For self-hosted Renovate, set the `LOG_FILE` environment variable.
+To get this log: if you use the _hosted_ Mend GitHub app, download a run log from [https://developer.mend.io](https://developer.mend.io). For self-hosted Renovate, set the `LOG_FILE` environment variable (see [documentation](https://docs.renovatebot.com/config-overview/#logging-variables)).
 
 `renovate-log-parser` offers the following commands:
 
-- `detect-errors` scans the log for potential problems and warnings. If it finds a problem, it exits with an error and reports the cause. This solves hidden Renovate issues you would otherwise miss.
+- `detect-errors` scans the log for potential problems and warnings. If it finds a problem, it exits with an error and reports the cause. It solves that you miss hidden Renovate issues, by offering an (opinionated) configuration treats specific warnings as errors.
 - `analyze` reports the log structure. A SKILL.md teaches coding agents to read relevant lines and diagnose Renovate problems with fewer tokens.
 - `web` starts a temporary local web server. The server parses logs of _any_ length and provides an interface for analysis and filtering. This interface replaces manual “grep”-like analysis that can overwhelm a text editor.
 - `install-analyze-skill` writes a SKILL.md to your project or home directory. It can include instructions to get logs from self-hosted Renovate runs in GitHub Actions. Your agent then knows how to get and read a log.
@@ -45,7 +45,7 @@ The `?log=` parameter contains the path _inside_ the container. This parameter m
 
 This tool solves these problems:
 
-- Renovate is easy to configure for projects with many repositories and development teams. However, subtle problems can occur later without notice. For example, Renovate can stop creating PRs for complex reasons. It only adds a small notice block to the _Dependency dashboard_ GitHub issue. Teams that use _Jira_ can miss this notice because they do not read GitHub issues.
+- Renovate is easy to configure for projects with many repositories and development teams. However, subtle problems can occur later without notice. For example, Renovate can stop creating PRs for complex reasons. It only adds a small notice block with warnings to the _Dependency dashboard_ GitHub issue. But some developers rarely look at the Dependency dashboard (thus, they are oblivious of the warnings) - and there is no push mechanism to notify them about changes in the Dependency dashboard (like added warnings). Also, not all Renovate warnings are equally important: e.g., "Hidden Unicode characters have been discovered..." is less critical than "Host error". Therefore, it's difficult for developers (or operators of self-hosted Renovate instances) to identify and fix such critical warnings in a timely manner.
 - Developers do not always understand the actions of Renovate Bot. Renovate can omit expected actions or do unwanted actions. Manual analysis is difficult for non-experts because the debug-level log is overly verbose. Important information often occurs in _debug_\-level lines, not warning- or error-level lines. AI agents can miss information in large logs or use many tokens for analysis. Consequently, users accept a suboptimal Renovate configuration or become frustrated with Renovate.
 
 This tool automatically detects these subtle problems. It also makes manual and AI-assisted analysis of Renovate log files simpler.
