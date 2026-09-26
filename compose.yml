@@ -17,7 +17,7 @@ services:
     restart: no
 
   firewall:
-    image: nginx:1.31.6-alpine@sha256:d10753d9289b8e3f884386351f73554ce72b631378949deddd75e83ee296c427
+    image: nginx:1.31.6-alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
     depends_on:
       certificate-generator:
         condition: service_completed_successfully
