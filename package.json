@@ -68,7 +68,7 @@
     "pixelmatch": "8.0.0",
     "playwright-core": "1.64.0",
     "pngjs": "7.0.0",
-    "prettier": "3.9.9",
+    "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.1"
