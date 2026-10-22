@@ -12,7 +12,7 @@
 # browser away from the one the baselines were made with.
 #
 # Rebuilt only when this file (or that version) changes; see README.md.
-FROM node:24@sha256:7b559cf7f77d837192392499a850abb1a3d1f49fbc2bd0692d54b212c9e38f6d
+FROM node:24@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
 
 # Must match `devDependencies.playwright-core` in the root package.json. The
 # `test:e2e:screenshots*` scripts read it from there and pass it in.
