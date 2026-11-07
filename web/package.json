@@ -15,7 +15,7 @@
     "@iconify-json/simple-icons": "^1.2.87",
     "@nuxt/ui": "4.12.0",
     "nuxt": "4.6.2",
-    "tailwindcss": "4.3.3"
+    "tailwindcss": "4.3.4"
   },
   "devDependencies": {
     "@nuxt/eslint": "1.17.0",
