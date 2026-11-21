@@ -1,6 +1,6 @@
 services:
   certificate-generator:
-    image: alpine/openssl:3.5.9@sha256:6821afa2476e11be343f29275f2ca24291720ff0a7148bd131fd8e314ff26d9e
+    image: alpine/openssl:3.5.9@sha256:9698e7956c08e713265da24c4587205beba3eaa6af2b319d73575d30a6ff033e
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
